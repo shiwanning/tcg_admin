@@ -1,0 +1,2 @@
+Insert into TCG_ADMIN.WF_TASK_TYPE_LABEL (TYPE_CODE,LANG_CODE,LABEL,DESCRIPTION) values ('MER','en_US','MER','Merchant');
+Insert into TCG_ADMIN.WF_TASK_TYPE_LABEL (TYPE_CODE,LANG_CODE,LABEL,DESCRIPTION) values ('MER','zh_CN','商','Merchant');

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xml>
+<Configuration>
+
+    <Properties>
+        <Property name="fileName">tcg-admin.log</Property>
+        <Property name="pattern">%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5p] [%t] [%C{1}.%M] (%F:%L) - %m%n</Property>
+        <Property name="logPath">logs/</Property>
+    </Properties>
+
+    <Appenders>
+
+        <RollingFile name="R" append="true" fileName="${logPath}${fileName}"
+                     filePattern="${logPath}${fileName}.%d{yyyy-MM-dd}.%i">
+            <PatternLayout pattern="${pattern}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="100 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+
+        <RollingFile name="behavior" append="true" fileName="${logPath}behavior/behavior.log"
+                     filePattern="${logPath}behavior/behavior.log.%d{yyyy-MM-dd}.%i">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} - %m%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="100 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+        
+        <Console name="STDOUT" target="SYSTEM_OUT">
+            <PatternLayout pattern="${pattern}"/>
+        </Console>
+    </Appenders>
+    
+    <Loggers>
+        
+        <logger name="com.tcg" level="DEBUG"/>
+        <logger name="com.yx" level="DEBUG"/>
+
+        <logger name="behaviorLog" additivity="false" level="INFO">
+            <appender-ref ref="behavior"/>
+        </logger>
+
+        <root additivity="false" level="INFO">
+            <appender-ref ref="R" />
+            <appender-ref ref="STDOUT"/>
+        </root>
+        
+    </Loggers>
+</Configuration>

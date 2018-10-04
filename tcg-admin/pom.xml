@@ -1,0 +1,555 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<parent> 
+		<groupId>com.tcg</groupId>
+		<artifactId>tcg-admin-project</artifactId>
+		<version>1.0.0-SNAPSHOT</version>
+	</parent>
+
+	<modelVersion>4.0.0</modelVersion>
+	<artifactId>tcg-admin</artifactId>
+	<packaging>war</packaging>
+
+    <properties>
+        <spring.version>4.3.12.RELEASE</spring.version>
+        <springfox-swagger2.version>2.7.0</springfox-swagger2.version>
+        <jackson.version>2.9.2</jackson.version>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- ============================================ -->
+        <!-- Sonar   -->
+        <!-- ============================================ -->
+        <sonar.jacoco.itReportPath>${project.basedir}/../target/jacoco-it.exec</sonar.jacoco.itReportPath>
+        <sonar.language>java</sonar.language>
+
+        <!-- ============================================ -->
+        <!-- Controller   -->
+        <!-- ============================================ -->
+
+        <jackson-core-asl.version>1.9.13</jackson-core-asl.version>
+        <jackson-mapper-asl.version>1.9.2</jackson-mapper-asl.version>
+        <gson.version>2.2.4</gson.version>
+        <!-- ============================================ -->
+        <!-- Persistence   -->
+        <!-- ============================================ -->
+
+        <hibernate-core.version>4.2.7.Final</hibernate-core.version>
+        <hibernate-entitymanager.version>4.2.7.Final</hibernate-entitymanager.version>
+        <hibernate-ehcache.version>4.2.7.Final</hibernate-ehcache.version>
+        <hibernate-validator.version>4.3.1.Final</hibernate-validator.version>
+        <hibernate-jpa.version>1.0.1.Final</hibernate-jpa.version>
+        <spring-data-jpa.version>1.6.4.RELEASE</spring-data-jpa.version>
+        <spring-data-commons.version>1.8.0.RELEASE</spring-data-commons.version> <!-- JPA 2.0 -->
+        <querydsl.version>3.4.3</querydsl.version>
+        <ojdbc6.version>11.2.0.3</ojdbc6.version>
+
+        <!-- ============================================ -->
+        <!-- Spring   -->
+        <!-- ============================================ -->
+
+        <spring-aspects.version>4.0.5.RELEASE</spring-aspects.version>
+        <spring-test.version>4.1.1.RELEASE</spring-test.version>
+
+        <!-- ============================================ -->
+        <!-- BPM - Apache Activiti  -->
+        <!-- ============================================ -->
+
+        <activiti-engine-version>5.16.4</activiti-engine-version>
+        <activiti-cdi-version>5.16.4</activiti-cdi-version>
+
+        <!-- ============================================ -->
+        <!-- Shiro  -->
+        <!-- ============================================ -->
+
+        <shiro.version>1.2.2</shiro.version>
+        <pax-shiro-cdi.version>0.1.0</pax-shiro-cdi.version>
+
+        <!-- ============================================ -->
+        <!-- Quartz   -->
+        <!--
+        In order to integrate to Terracotta 3.7.7 developer console to monitor quarzt scheduler instance,
+        the only one compatible quartz version is 2.1.7
+        -->
+        <!-- ============================================ -->
+
+        <quartz.version>2.1.7</quartz.version>
+
+        <!-- ============================================ -->
+        <!-- Common Tools   -->
+        <!-- ============================================ -->
+
+        <slf4j.version>1.7.7</slf4j.version>
+        <log4j2.version>2.1</log4j2.version>
+
+        <!-- Disable the log4j 1.2.x series usage .-->
+        <log4j.version>1.2.17</log4j.version>
+
+        <log4j2-logstash.version>3.1.1</log4j2-logstash.version>
+        <common.bean.utils.version>1.8.3</common.bean.utils.version>
+        <commons-configuration.version>1.10</commons-configuration.version>
+        <commons-lang3.version>3.3.2</commons-lang3.version>
+        <commons-collections.version>3.2.1</commons-collections.version>
+        <commons-math3.version>3.6.1</commons-math3.version>
+        <bcprov.version>1.46</bcprov.version>
+        <commons-codec.version>1.9</commons-codec.version>
+        <beanutils.version>1.9.2</beanutils.version>
+        <commons-dbcp.version>1.4</commons-dbcp.version>
+        <h2.version>1.4.177</h2.version>
+        <!--<ehcache.version>2.9.0</ehcache.version>-->
+        <ehcache-core.version>2.7.0</ehcache-core.version>
+        <ehcache-terracotta.version>2.1.1</ehcache-terracotta.version>
+        <jasypt.version>1.9.2</jasypt.version>
+        <guava.version>18.0</guava.version>
+        <cache-annotations-ri-cdi.version>1.1.0</cache-annotations-ri-cdi.version>
+        <jcache.version>1.0.0</jcache.version>
+
+        <!-- ============================================ -->
+        <!-- Fundamental   -->
+        <!-- ============================================ -->
+
+        <maven-compiler-plugin.version>3.2</maven-compiler-plugin.version>
+        <findbugs-maven-plugin.version>3.0.0</findbugs-maven-plugin.version>
+        <cobertura-maven-plugin.version>2.7</cobertura-maven-plugin.version>
+        <maven-surefire-plugin.version>2.19.1</maven-surefire-plugin.version>
+        <maven-pmd-plugin.version>3.4</maven-pmd-plugin.version>
+        <maven-project-info-reports-plugin.version>2.8</maven-project-info-reports-plugin.version>
+
+        <jdk.version>1.7</jdk.version>
+        <servlet-api.version>3.1.0</servlet-api.version>
+        <javaee.api.version>7.0</javaee.api.version>
+        <javax.mail.version>1.4</javax.mail.version>
+
+
+        <!-- ============================================ -->
+        <!-- Test   -->
+        <!-- ============================================ -->
+        <junit.version>4.11</junit.version>
+        <jBehave.version>3.9.2</jBehave.version>
+        <jBehave.runner.version>1.1.0</jBehave.runner.version>
+        <powermock.version>1.5.5</powermock.version>
+        <mockito.version>1.9.5</mockito.version>
+        <JUnitParams.version>1.0.4</JUnitParams.version>
+        <hamcrest-core.version>1.3</hamcrest-core.version>
+        <joda-time.version>2.6</joda-time.version>
+    </properties>
+
+	<dependencies>
+
+		<!-- ================================================================ -->
+        <!-- Common -->
+		<!-- ================================================================ -->
+        <!-- Yx Common -->
+
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>3.11</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi</artifactId>
+			<version>3.11</version>
+		</dependency>
+
+        <dependency>
+            <groupId>com.tcg</groupId>
+            <artifactId>imbo-gateway-client-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.tcg</groupId>
+            <artifactId>imbo-gateway-common</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+        </dependency>
+
+        <!-- ================================================================ -->
+		<!-- Other 3rd libraries -->
+		<!-- ================================================================ -->
+
+		<dependency>
+			<groupId>commons-collections</groupId>
+			<artifactId>commons-collections</artifactId>
+            <version>${commons-collections.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>commons-codec</groupId>
+			<artifactId>commons-codec</artifactId>
+            <version>${commons-codec.version}</version>
+		</dependency>
+
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.5</version>
+        </dependency>
+
+        <dependency>
+		  <groupId>commons-fileupload</groupId>
+		  <artifactId>commons-fileupload</artifactId>
+		  <version>1.2.2</version>
+		</dependency>
+
+        <dependency>
+			<groupId>org.jasypt</groupId>
+			<artifactId>jasypt</artifactId>
+            <version>${jasypt.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpclient</artifactId>
+			<version>4.3.4</version>
+		</dependency>
+
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guava.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-math3</artifactId>
+            <version>${commons-math3.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.oracle</groupId>
+            <artifactId>ojdbc7</artifactId>
+            <version>12.1.0.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+        
+        <dependency>
+            <groupId>io.springfox</groupId>
+            <artifactId>springfox-swagger2</artifactId>
+            <version>${springfox-swagger2.version}</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>spring-beans</artifactId>
+                    <groupId>org.springframework</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>io.springfox</groupId>
+            <artifactId>springfox-swagger-ui</artifactId>
+            <version>${springfox-swagger2.version}</version>
+        </dependency>
+		<dependency>
+            <groupId>joda-time</groupId>
+            <artifactId>joda-time</artifactId>
+            <version>2.10</version>
+        </dependency>
+		<dependency>
+		    <groupId>com.googlecode.lambdaj</groupId>
+		    <artifactId>lambdaj</artifactId>
+		    <version>2.3.3</version>
+		</dependency>
+		
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <version>${spring.version}</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context-support</artifactId>
+            <version>${spring.version}</version>
+        </dependency>
+        
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+            <version>${spring.version}</version>
+        </dependency>
+        
+		<!-- https://mvnrepository.com/artifact/org.hamcrest/java-hamcrest -->
+		<dependency>
+		    <groupId>org.hamcrest</groupId>
+		    <artifactId>java-hamcrest</artifactId>
+		    <version>2.0.0.0</version>
+		</dependency>
+
+		<!-- ================================================================ -->
+		<!-- Hibernate -->
+		<!-- ================================================================ -->
+
+		<dependency>
+			<groupId>org.hibernate</groupId>
+			<artifactId>hibernate-entitymanager</artifactId>
+            <version>${hibernate-entitymanager.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.hibernate.javax.persistence</groupId>
+			<artifactId>hibernate-jpa-2.0-api</artifactId>
+            <version>${hibernate-jpa.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.hibernate</groupId>
+			<artifactId>hibernate-ehcache</artifactId>
+            <version>${hibernate-ehcache.version}</version>
+            <exclusions>
+             <exclusion>
+              <groupId>net.sf.ehcache</groupId>
+              <artifactId>ehcache-core</artifactId>
+             </exclusion>
+            </exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.hibernate</groupId>
+			<artifactId>hibernate-validator</artifactId>
+            <version>${hibernate-validator.version}</version>
+		</dependency>
+
+        <!-- ================================================================ -->
+        <!-- Spring Data JPA -->
+        <!-- ================================================================ -->
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-jpa</artifactId>
+            <version>${spring-data-jpa.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mysema.querydsl</groupId>
+            <artifactId>querydsl-apt</artifactId>
+            <version>${querydsl.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mysema.querydsl</groupId>
+            <artifactId>querydsl-core</artifactId>
+            <version>${querydsl.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mysema.querydsl</groupId>
+            <artifactId>querydsl-jpa</artifactId>
+            <version>${querydsl.version}</version>
+        </dependency>
+         <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-commons</artifactId>
+            <version>${spring-data-commons.version}</version>
+        </dependency>
+
+        <!-- ================================================================ -->
+		<!-- ehcache (AP cache) -->
+		<!-- ================================================================ -->
+		<dependency>
+			<groupId>net.sf.ehcache</groupId>
+			<artifactId>ehcache</artifactId>
+            <version>${ehcache-core.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.ehcache</groupId>
+			<artifactId>jcache</artifactId>
+            <version>${jcache.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.jsr107.ri</groupId>
+			<artifactId>cache-annotations-ri-cdi</artifactId>
+            <version>${cache-annotations-ri-cdi.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>net.sf.ehcache</groupId>
+			<artifactId>ehcache-terracotta</artifactId>
+            <version>${ehcache-terracotta.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>aopalliance</groupId>
+			<artifactId>aopalliance</artifactId>
+			<version>1.0</version>
+		</dependency>
+
+		<!-- ================================================================ -->
+		<!-- shiro -->
+		<!-- ================================================================ -->
+
+		<dependency>
+			<groupId>org.apache.shiro</groupId>
+			<artifactId>shiro-web</artifactId>
+            <version>${shiro.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.shiro</groupId>
+			<artifactId>shiro-ehcache</artifactId>
+            <version>${shiro.version}</version>
+            <exclusions>
+             <exclusion>
+              <groupId>net.sf.ehcache</groupId>
+              <artifactId>ehcache-core</artifactId>
+             </exclusion>
+            </exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.ops4j.pax.shiro</groupId>
+			<artifactId>pax-shiro-cdi</artifactId>
+            <version>${pax-shiro-cdi.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ops4j.pax.shiro</groupId>
+			<artifactId>pax-shiro-cdi-web</artifactId>
+            <version>${pax-shiro-cdi.version}</version>
+		</dependency>
+        <!-- https://mvnrepository.com/artifact/org.apache.shiro/shiro-spring -->
+        <dependency>
+            <groupId>org.apache.shiro</groupId>
+            <artifactId>shiro-spring</artifactId>
+            <version>1.4.0</version>
+        </dependency>
+        
+        <!--jackson-->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>${servlet-api.version}</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.2.4</version>
+        </dependency>
+
+        <!-- ================================================================ -->
+        <!-- gooogle auth -->
+        <!-- ================================================================ -->
+        <dependency>
+          <groupId>com.warrenstrange</groupId>
+          <artifactId>googleauth</artifactId>
+          <version>1.1.2</version>
+        </dependency>
+
+		<!-- test -->
+		<!-- must use this version -->
+		<dependency>
+			<groupId>org.hamcrest</groupId>
+			<artifactId>hamcrest-core</artifactId>
+            <version>${hamcrest-core.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.hamcrest</groupId>
+			<artifactId>hamcrest-library</artifactId>
+			<version>1.3</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-all</artifactId>
+            <version>${mockito.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>net.sf.json-lib</groupId>
+			<artifactId>json-lib</artifactId>
+			<version>2.4</version>
+			<classifier>jdk15</classifier>
+		</dependency>
+        <dependency>
+          <groupId>com.warrenstrange</groupId>
+          <artifactId>googleauth</artifactId>
+          <version>1.2.0</version>
+        </dependency>
+	</dependencies>
+
+	<build>
+    		<plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                      <!-- or whatever version you use -->
+                      <source>1.7</source>
+                      <target>1.7</target>
+                    </configuration>
+                </plugin>
+    			<plugin>
+    				<groupId>org.apache.maven.plugins</groupId>
+    				<artifactId>maven-javadoc-plugin</artifactId>
+    				<version>2.10.4</version>
+    				<configuration>
+    					<charset>UTF-8</charset>
+    					<docencoding>UTF-8</docencoding>
+    					<failOnError>false</failOnError>
+    				</configuration>
+    			</plugin>
+    			<plugin>
+    				<groupId>com.github.kongchen</groupId>
+    				<artifactId>swagger-maven-plugin</artifactId>
+    				<version>3.1.3</version>
+    				<configuration>
+    					<apiSources>
+    						<apiSource>
+                                <locations>com.tcg.admin.controller</locations>
+    							<schemes>http</schemes>
+                                <host>dev-tac-swagger.tcg.com</host>
+                                <basePath>/tcg-admin</basePath>
+    							<info>
+                                    <title>This is a REST API Document for TC Admin Console</title>
+    								<version>v1</version>
+    								<description>
+                                        This is a REST API Document for Admin Console.
+                                        Requests need include the token (named :
+    									"Authorization")
+    									in
+    									the headers .
+    								</description>
+    							</info>
+    							<outputPath>target/rest-api-doc/document.html</outputPath>
+    							<swaggerDirectory>target/rest-api-doc/swagger-ui</swaggerDirectory>
+    							<!--<swaggerFileName>tcg-swagger</swaggerFileName> -->
+    						</apiSource>
+    					</apiSources>
+    				</configuration>
+    				<executions>
+    				</executions>
+    			</plugin>
+    
+                <plugin>
+                    <groupId>com.mysema.maven</groupId>
+                    <artifactId>apt-maven-plugin</artifactId>
+                </plugin>
+    		</plugins>
+	</build>
+
+</project>

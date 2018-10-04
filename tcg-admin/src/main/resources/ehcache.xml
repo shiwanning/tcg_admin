@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ehcache name="cache-ap-admin" updateCheck="false">
+	<diskStore path="java.io.tmpdir/cache-dir" />
+
+    <defaultCache diskPersistent="false" eternal="false"
+                  maxElementsInMemory="5000" overflowToDisk="false" statistics="true"
+                  timeToIdleSeconds="1800" timeToLiveSeconds="1800">
+	</defaultCache>
+
+    <cache name="cache-ap-admin"
+        diskPersistent="false" eternal="false"
+                  maxElementsInMemory="5000" overflowToDisk="false" statistics="true"
+                  timeToIdleSeconds="1800" timeToLiveSeconds="1800">
+    </cache>
+
+	<cache name="task-operator-viewers"
+		maxEntriesLocalHeap="0"
+		diskExpiryThreadIntervalSeconds="600" 
+		diskPersistent="true" 
+		eternal="false"
+		maxElementsInMemory="100000" 
+		overflowToDisk="false" 
+		timeToIdleSeconds="600"
+		timeToLiveSeconds="0">
+	</cache>
+    
+    <cache name="task-create"
+        maxEntriesLocalHeap="0"
+        diskExpiryThreadIntervalSeconds="10" 
+        diskPersistent="false" 
+        eternal="false"
+        maxElementsInMemory="1000" 
+        overflowToDisk="false" 
+        timeToIdleSeconds="1"
+        timeToLiveSeconds="1">
+    </cache>
+    
+    <cache name="findByMenuIdPermission"
+        diskPersistent="false" eternal="false"
+                  maxElementsInMemory="5000" overflowToDisk="false" statistics="true"
+                  timeToIdleSeconds="1800" timeToLiveSeconds="1800">
+    </cache>
+</ehcache>

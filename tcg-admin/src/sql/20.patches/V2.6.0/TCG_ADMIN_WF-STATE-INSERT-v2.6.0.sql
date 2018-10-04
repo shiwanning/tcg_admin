@@ -1,0 +1,3 @@
+Insert into TCG_ADMIN.WF_STATE (STATE_ID,STATE_NAME,TYPE,DESCRIPTION,MENU_ID,PARENT_ID,VIEW_URL_ID) values (300,'Helper-Pending','SYS','Processed Helper',10805,null,'tac/#/helperTask');
+Insert into TCG_ADMIN.WF_STATE (STATE_ID,STATE_NAME,TYPE,DESCRIPTION,MENU_ID,PARENT_ID,VIEW_URL_ID) values (301,'Helper-Approved','SYS','Approved Helpert',10806,300,'tac/#/helperTask');
+Insert into TCG_ADMIN.WF_STATE (STATE_ID,STATE_NAME,TYPE,DESCRIPTION,MENU_ID,PARENT_ID,VIEW_URL_ID) values (302,'Helper-Rejected','SYS','Reject Helper',10807,300,'tac/#/helperTask');

@@ -1,0 +1,36 @@
+--------------------------------------------------------
+--  已建立檔案 - 星期五-三月-10-2017   
+--------------------------------------------------------
+--------------------------------------------------------
+--  DDL for Table US_OPERATOR_PROFILE
+--------------------------------------------------------
+
+  CREATE TABLE "TCG_ADMIN"."US_OPERATOR_PROFILE" 
+   (	"OPERATOR_ID" NUMBER(10,0), 
+	"PASSWD_LAST_MODIFY_DATE" TIMESTAMP (6), 
+	"MOBILE_NO" VARCHAR2(20 BYTE), 
+	"EMAIL" VARCHAR2(20 BYTE), 
+	"LAST_LOGIN_IP" VARCHAR2(45 BYTE), 
+	"NO_ACTIVE" NUMBER(4,0), 
+	"PAGE_SIZE" NUMBER(3,0) DEFAULT 20, 
+	"LAST_LOGIN_TIME" DATE,
+	"LAST_LOGOUT_TIME" DATE, 
+	"VERSION" NUMBER(8,0) DEFAULT 0,
+	"CREATE_TIME" TIMESTAMP (6) DEFAULT CURRENT_TIMESTAMP,
+	"UPDATE_TIME" TIMESTAMP (6) DEFAULT CURRENT_TIMESTAMP,
+	"BIRTHDAY" DATE, 
+	"LOGIN" VARCHAR2(1 BYTE)
+   ) ;
+
+   COMMENT ON COLUMN "TCG_ADMIN"."US_OPERATOR_PROFILE"."NO_ACTIVE" IS '不活躍天數';
+   COMMENT ON COLUMN "TCG_ADMIN"."US_OPERATOR_PROFILE"."PAGE_SIZE" IS '頁面顯示數';
+   COMMENT ON COLUMN "TCG_ADMIN"."US_OPERATOR_PROFILE"."LOGIN" IS '用戶目前是否登入 0：false 1: true';
+
+--------------------------------------------------------
+--  Constraints for Table US_OPERATOR_PROFILE
+--------------------------------------------------------
+
+  ALTER TABLE "TCG_ADMIN"."US_OPERATOR_PROFILE" MODIFY ("UPDATE_TIME" NOT NULL ENABLE);
+  ALTER TABLE "TCG_ADMIN"."US_OPERATOR_PROFILE" MODIFY ("CREATE_TIME" NOT NULL ENABLE);
+  ALTER TABLE "TCG_ADMIN"."US_OPERATOR_PROFILE" MODIFY ("VERSION" NOT NULL ENABLE);
+  ALTER TABLE "TCG_ADMIN"."US_OPERATOR_PROFILE" MODIFY ("OPERATOR_ID" NOT NULL ENABLE);

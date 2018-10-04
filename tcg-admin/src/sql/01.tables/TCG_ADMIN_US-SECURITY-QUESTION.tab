@@ -1,0 +1,37 @@
+--------------------------------------------------------
+--  已建立檔案 - 星期三-二月-15-2017   
+--------------------------------------------------------
+--------------------------------------------------------
+--  DDL for Table US_SECURITY_QUESTION
+--------------------------------------------------------
+
+  CREATE TABLE "TCG_ADMIN"."US_SECURITY_QUESTION" 
+   (	"SEQ_ID" NUMBER(10,0), 
+	"QUESTION" NVARCHAR2(256), 
+	"VERSION" NUMBER(8,0) DEFAULT 0, 
+	"CREATE_TIME" TIMESTAMP (6) DEFAULT CURRENT_TIMESTAMP, 
+	"UPDATE_TIME" TIMESTAMP (6) DEFAULT CURRENT_TIMESTAMP
+   ) ;
+
+   COMMENT ON COLUMN "TCG_ADMIN"."US_SECURITY_QUESTION"."SEQ_ID" IS 'Primary Key - ID';
+   COMMENT ON COLUMN "TCG_ADMIN"."US_SECURITY_QUESTION"."QUESTION" IS 'Question ';
+   COMMENT ON COLUMN "TCG_ADMIN"."US_SECURITY_QUESTION"."VERSION" IS 'VERSION';
+   COMMENT ON COLUMN "TCG_ADMIN"."US_SECURITY_QUESTION"."CREATE_TIME" IS '新增時間';
+   COMMENT ON COLUMN "TCG_ADMIN"."US_SECURITY_QUESTION"."UPDATE_TIME" IS '更新時間';
+--------------------------------------------------------
+--  DDL for Index US_SQ_PK
+--------------------------------------------------------
+
+  CREATE UNIQUE INDEX "TCG_ADMIN"."US_SQ_PK" ON "TCG_ADMIN"."US_SECURITY_QUESTION" ("SEQ_ID") 
+  ;
+--------------------------------------------------------
+--  Constraints for Table US_SECURITY_QUESTION
+--------------------------------------------------------
+
+  ALTER TABLE "TCG_ADMIN"."US_SECURITY_QUESTION" ADD CONSTRAINT "US_SQ_PK" PRIMARY KEY ("SEQ_ID")
+  USING INDEX  ENABLE;
+  ALTER TABLE "TCG_ADMIN"."US_SECURITY_QUESTION" MODIFY ("CREATE_TIME" NOT NULL ENABLE);
+  ALTER TABLE "TCG_ADMIN"."US_SECURITY_QUESTION" MODIFY ("UPDATE_TIME" NOT NULL ENABLE);
+  ALTER TABLE "TCG_ADMIN"."US_SECURITY_QUESTION" MODIFY ("VERSION" NOT NULL ENABLE);
+  ALTER TABLE "TCG_ADMIN"."US_SECURITY_QUESTION" MODIFY ("QUESTION" NOT NULL ENABLE);
+  ALTER TABLE "TCG_ADMIN"."US_SECURITY_QUESTION" MODIFY ("SEQ_ID" NOT NULL ENABLE);

@@ -1,0 +1,1 @@
+Insert into TCG_ADMIN.US_MENU_ITEM (MENU_ID,URL,MENU_NAME,DESCRIPTION,PARENT_ID,IS_LEAF,IS_DISPLAY,DISPLAY_ORDER,TREE_LEVEL,VERSION,IS_BUTTON,ICON,ACCESS_TYPE,MENU_TYPE) values (12004,'/MerFunctionalMapping/Initialize','Initialize Module Mapping','Initialize Module mapping for WPS gateway',12001,1,1,3,3,0,0,null,'1',1);

@@ -1,0 +1,30 @@
+<ehcache name="cache-jpa-admin" updateCheck="false">
+
+    <defaultCache
+        diskExpiryThreadIntervalSeconds="120"
+        eternal="false"
+        maxElementsInMemory="5000"
+        overflowToDisk="false"
+        diskPersistent="false"
+        statistics="true"
+        timeToIdleSeconds="3600"
+        timeToLiveSeconds="3600"
+    />
+
+    <cache name="jpaRealm.authorizationCache"
+           diskExpiryThreadIntervalSeconds="7200"
+           diskPersistent="false"
+           eternal="false"
+           maxElementsInMemory="10000"
+           overflowToDisk="false"
+           statistics="true"
+           timeToIdleSeconds="7200"
+           timeToLiveSeconds="7200">
+    </cache>
+
+    <cache name="com.tcg.admin.model.ApiLabel"
+           maxElementsInMemory="500"
+           eternal="false"
+           timeToIdleSeconds="5"
+           timeToLiveSeconds="200"/>
+</ehcache>

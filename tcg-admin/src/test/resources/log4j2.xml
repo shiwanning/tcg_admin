@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xml>
+<Configuration>
+
+    <Properties>
+        <Property name="pattern">%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5p] [%t] [%C{1}.%M] (%F:%L) - %m%n</Property>
+    </Properties>
+
+    <Appenders>
+
+        <Console name="STDOUT" target="SYSTEM_OUT">
+            <PatternLayout pattern="${pattern}"/>
+        </Console>
+
+    </Appenders>
+
+    <Loggers>
+
+        <Logger name="com.yx" level="DEBUG"/>
+        <Logger name="com.tcg" level="DEBUG"/>
+
+        <Root level="DEBUG">
+            <AppenderRef ref="STDOUT"/>
+        </Root>
+
+    </Loggers>
+
+</Configuration>

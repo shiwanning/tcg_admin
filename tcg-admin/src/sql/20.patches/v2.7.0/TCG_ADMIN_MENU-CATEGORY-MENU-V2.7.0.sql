@@ -1,0 +1,26 @@
+--------------------------------------------------------
+--  DDL for Table US_MENU_CATEGORY_MENU
+--------------------------------------------------------
+
+  CREATE TABLE "TCG_ADMIN"."US_MENU_CATEGORY_MENU"
+   (	"MENU_CATEGORY_NAME" NVARCHAR2(100), 
+	"MENU_ID" NUMBER(8,0), 
+	"VERSION" NUMBER(8,0) DEFAULT 0, 
+	"CREATE_TIME" TIMESTAMP (6) DEFAULT CURRENT_TIMESTAMP, 
+	"UPDATE_TIME" TIMESTAMP (6) DEFAULT CURRENT_TIMESTAMP
+   );
+--------------------------------------------------------
+--  DDL for Index US_MENU_CATEGORY_MENU_PK
+--------------------------------------------------------
+
+  CREATE UNIQUE INDEX "TCG_ADMIN"."US_MENU_CATEGORY_MENU_PK" ON "TCG_ADMIN"."US_MENU_CATEGORY_MENU" ("MENU_CATEGORY_NAME", "MENU_ID");
+--------------------------------------------------------
+--  Constraints for Table US_MENU_CATEGORY_MENU
+--------------------------------------------------------
+
+  ALTER TABLE "TCG_ADMIN"."US_MENU_CATEGORY_MENU" MODIFY ("MENU_CATEGORY_NAME" NOT NULL ENABLE);
+  ALTER TABLE "TCG_ADMIN"."US_MENU_CATEGORY_MENU" MODIFY ("MENU_ID" NOT NULL ENABLE);
+  ALTER TABLE "TCG_ADMIN"."US_MENU_CATEGORY_MENU" ADD CONSTRAINT "US_MENU_CATEGORY_MENU_PK" PRIMARY KEY ("MENU_CATEGORY_NAME", "MENU_ID");
+
+
+INSERT INTO TCG_ADMIN.US_MENU_CATEGORY_MENU (MENU_CATEGORY_NAME, MENU_ID) SELECT 'SYSTEM',M.MENU_ID FROM TCG_ADMIN.US_MENU_ITEM M;

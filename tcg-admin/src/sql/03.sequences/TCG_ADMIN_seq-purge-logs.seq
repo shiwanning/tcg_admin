@@ -1,0 +1,10 @@
+--------------------------------------------------------
+--  DDL for Sequence SEQ_PURGE_DATA_SETTING
+--------------------------------------------------------
+
+   CREATE SEQUENCE  "TCG_ADMIN"."SEQ_PURGE_DATA_SETTING"  MINVALUE 1 MAXVALUE 9999999999 INCREMENT BY 1 START WITH 4001 CACHE 1000 NOORDER  CYCLE  NOKEEP  GLOBAL ;
+--------------------------------------------------------
+--  DDL for Sequence SEQ_PURGE_DATA_LOG
+--------------------------------------------------------
+
+   CREATE SEQUENCE  "TCG_ADMIN"."SEQ_PURGE_DATA_LOG"  MINVALUE 1 MAXVALUE 9999999999 INCREMENT BY 1 START WITH 3001 CACHE 1000 NOORDER  CYCLE  NOKEEP  GLOBAL ;
