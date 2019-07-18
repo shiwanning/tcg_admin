@@ -40,42 +40,47 @@ public class Permission {
     public static List<Permission> permisionTreeGrid(List<Permission> list, List<Permission> listall, int count) {
         List<Permission> treelist = Lists.newLinkedList();
         int nodeid = 0;
-        Permission r;
         for (Permission resources : list) {
-            List<Permission> list1 = Lists.newLinkedList();//上级节点的子节点
-            if (resources.getParentId().equals(count)) {
-                for (Permission res : listall) {
-                    if (res.getParentId().equals(resources.getMenuId())) {
-                        nodeid = res.getParentId();
-                        list1.add(res);
-                    }
-                }
-                r = new Permission();
-                r.setState("open");
-                if (resources.getTreeLevel().equals(SystemConstant.TREELEVEL) && !list1.isEmpty()) {
-                    r.setState("closed");
-                }
-                r.setDescription(resources.getDescription());
-                r.setIsLeaf(resources.getIsLeaf());
-                r.setDisplayOrder(resources.getDisplayOrder());
-                r.setParentId(resources.getParentId());
-                r.setMenuName(resources.getMenuName());
-                r.setTreeLevel(resources.getTreeLevel());
-                r.setUrl(resources.getUrl());
-                r.setIsButton(resources.getIsButton());
-                r.setMenuId(resources.getMenuId());
-                r.setChildren(permisionTreeGrid(list1, listall, nodeid));
-                r.setIsDisplay(resources.getIsDisplay());
-                r.setBpm(resources.getBpm());
-                r.setType(resources.getType());
-                r.setLabels(resources.getLabels());
-                treelist.add(r);
-            }
+        	if (resources.getParentId().equals(count)) {
+        		nodeid = processTreeList(treelist, resources, listall, nodeid);
+        	}
         }
         return treelist;
     }
 
-    public String getState() {
+    private static int processTreeList(List<Permission> treelist, Permission resources, List<Permission> listall, int nodeid) {
+    	List<Permission> list1 = Lists.newLinkedList();//上级节点的子节点
+    	int parentNodeId = nodeid;
+        for (Permission res : listall) {
+            if (res.getParentId().equals(resources.getMenuId())) {
+            	parentNodeId = res.getParentId();
+                list1.add(res);
+            }
+        }
+        Permission r = new Permission();
+        r.setState("open");
+        if (resources.getTreeLevel().equals(SystemConstant.TREELEVEL) && !list1.isEmpty()) {
+            r.setState("closed");
+        }
+        r.setDescription(resources.getDescription());
+        r.setIsLeaf(resources.getIsLeaf());
+        r.setDisplayOrder(resources.getDisplayOrder());
+        r.setParentId(resources.getParentId());
+        r.setMenuName(resources.getMenuName());
+        r.setTreeLevel(resources.getTreeLevel());
+        r.setUrl(resources.getUrl());
+        r.setIsButton(resources.getIsButton());
+        r.setMenuId(resources.getMenuId());
+        r.setChildren(permisionTreeGrid(list1, listall, parentNodeId));
+        r.setIsDisplay(resources.getIsDisplay());
+        r.setBpm(resources.getBpm());
+        r.setType(resources.getType());
+        r.setLabels(resources.getLabels());
+        treelist.add(r);
+        return nodeid;
+	}
+
+	public String getState() {
         return state;
     }
 

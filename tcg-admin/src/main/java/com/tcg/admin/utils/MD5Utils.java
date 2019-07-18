@@ -6,7 +6,7 @@ package com.tcg.admin.utils;
 public class MD5Utils {
 
     private MD5Utils() {
-
+    	throw new IllegalStateException("Utility class");
     }
 
     /**

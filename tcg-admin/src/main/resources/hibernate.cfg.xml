@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE hibernate-configuration PUBLIC
+    "-//Hibernate/Hibernate Configuration DTD//EN"
+    "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd">
+<hibernate-configuration>
+  <session-factory>
+      <property name="connection.url">jdbc:oracle:thin:@10.8.91.55:1521:TCG</property>
+      <property name="connection.driver_class">oracle.jdbc.OracleDriver</property>
+      <mapping resource="com/tcg/admin/controller/merchant/TacMerchantChargeCreditReview.hbm.xml"/>
+      <mapping class="com.tcg.admin.model.MerchantChargeCreditReview"/>
+
+      <!-- DB schema will be updated if needed -->
+    <!-- <property name="hbm2ddl.auto">update</property> -->
+  </session-factory>
+</hibernate-configuration>

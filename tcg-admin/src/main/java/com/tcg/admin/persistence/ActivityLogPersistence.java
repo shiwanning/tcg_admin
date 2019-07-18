@@ -43,11 +43,13 @@ public class ActivityLogPersistence {
             if(actionType == 4) {
                 List<Integer> actionTypeList = new ArrayList();
                 actionTypeList.add(4);
-                actionTypeList.add(41);
+//                actionTypeList.add(41);
                 booleanBuilder.and(behaviorLog.resourceType.in(actionTypeList));
             }else{
                 booleanBuilder.and(behaviorLog.resourceType.eq(actionType));
             }
+        } else {
+        	booleanBuilder.and(behaviorLog.resourceType.isNotNull());
         }
 
         query.from(behaviorLog)

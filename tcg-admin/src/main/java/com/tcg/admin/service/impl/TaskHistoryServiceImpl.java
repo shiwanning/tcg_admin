@@ -18,7 +18,6 @@ import com.tcg.admin.model.Task;
 import com.tcg.admin.persistence.StateRepositoryCustom;
 import com.tcg.admin.persistence.TaskRepositoryCustom;
 import com.tcg.admin.service.MerchantService;
-import com.tcg.admin.service.OperatorAuthenticationService;
 import com.tcg.admin.service.RoleMenuPermissionService;
 import com.tcg.admin.service.TaskHistoryService;
 import com.tcg.admin.to.NoneAdminInfo;
@@ -43,15 +42,12 @@ public class TaskHistoryServiceImpl implements TaskHistoryService {
 
 	@Autowired
 	private MerchantService merchantService;
-	
-	@Autowired
-    private OperatorAuthenticationService operatorAuthService;
 
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public Page<Task> getAll(TaskQueryTO taskQueryTO) {
 		NoneAdminInfo noneAdminInfo = merchantService.checkAdmin(true);
 		
-		UserInfo<Operator> userInfo = operatorAuthService.getOperatorByToken(RequestHelper.getToken());
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		
 		boolean isViewSysHelper = roleMenuPermissionService.verifyMenuItemPermission(userInfo.getUser().getOperatorId(), roleMenuPermissionService.queryMenuItemById(10800));
 		boolean isViewMerchant = roleMenuPermissionService.verifyMenuItemPermission(userInfo.getUser().getOperatorId(), roleMenuPermissionService.queryMenuItemById(10400));
@@ -75,7 +71,7 @@ public class TaskHistoryServiceImpl implements TaskHistoryService {
 
 	public List<State> getStateList(String type) {
 	    
-	    UserInfo<Operator> userInfo = operatorAuthService.getOperatorByToken(RequestHelper.getToken());
+	    UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 	    
 	    boolean isViewSysHelper = roleMenuPermissionService.verifyMenuItemPermission(userInfo.getUser().getOperatorId(), roleMenuPermissionService.queryMenuItemById(10800));
 	    boolean isViewMerchant = roleMenuPermissionService.verifyMenuItemPermission(userInfo.getUser().getOperatorId(), roleMenuPermissionService.queryMenuItemById(10400));

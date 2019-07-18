@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.tcg.admin.model.BehaviorLog;
 import com.tcg.admin.service.BehaviorLogService;
+import com.tcg.admin.to.condition.BehaviorCondition;
 import com.tcg.admin.to.response.JsonResponseT;
 
 /**
@@ -42,10 +43,20 @@ public class BehaviorLogResource {
             @RequestParam(value = "pageSize", required = false) int pageSize) {
             JsonResponseT<Page<BehaviorLog>> response = new JsonResponseT<>(true);
         Page<BehaviorLog> queryResultresponse;
+        
+        BehaviorCondition condition = new BehaviorCondition();
+		condition.setMerchant(merchant);
+		condition.setUsername(username);
+		condition.setActionType(actionType);
+		condition.setResourceIdList(this.convertIntegerList(resourceId));
+		condition.setKeyword(keyword);
+		condition.setStartDateTime(startDateTime);
+		condition.setEndDateTime(endDateTime);
+        
         if(isSystem){
-            queryResultresponse = behaviorLogService.queryBehaviorLogOfSystem(merchant,username, actionType , this.convertIntegerList(resourceId), keyword, startDateTime, endDateTime ,pageNo,pageSize);
+            queryResultresponse = behaviorLogService.queryBehaviorLogOfSystem(condition ,pageNo,pageSize);
         }else{
-            queryResultresponse = behaviorLogService.queryBehaviorLog(merchant,username, actionType , this.convertIntegerList(resourceId), keyword, startDateTime, endDateTime ,pageNo,pageSize);
+            queryResultresponse = behaviorLogService.queryBehaviorLog(condition ,pageNo,pageSize);
         }
             response.setValue(queryResultresponse);
             return response;

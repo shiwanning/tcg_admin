@@ -1,2 +1,0 @@
-
-Insert into TCG_ADMIN.US_MENU_ITEM (MENU_ID,URL,MENU_NAME,DESCRIPTION,PARENT_ID,IS_LEAF,IS_DISPLAY,DISPLAY_ORDER,TREE_LEVEL,VERSION,IS_BUTTON,ICON,ACCESS_TYPE) values (10408,'wps-console-web/#/MerchantTaskReject','Reject Merchant','Reject Merchant',10400,0,1,6,2,0,1,null,'0');

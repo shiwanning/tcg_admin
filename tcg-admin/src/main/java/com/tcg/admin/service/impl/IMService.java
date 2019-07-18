@@ -39,8 +39,13 @@ public class IMService {
 	
 	@PostConstruct
 	public void init() {
-	    MessageGatewayFactory factory = new MessageGatewayFactory();
-	    pushACMessageService = factory.createPushAcMessageService();
+		try {
+			MessageGatewayFactory factory = new MessageGatewayFactory();
+		    pushACMessageService = factory.createPushAcMessageService();
+		} catch(Throwable e) {
+			LOGGER.error("create EJB pushACMessageService error", e);
+		}
+	    
 	}
 	
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)

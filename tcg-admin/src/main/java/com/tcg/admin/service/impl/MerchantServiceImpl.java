@@ -1,12 +1,6 @@
 package com.tcg.admin.service.impl;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.ObjectUtils;
@@ -16,9 +10,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.google.common.collect.Lists;
+import com.tcg.admin.cache.MerchantCacheEvict;
+import com.tcg.admin.cache.MerchantCacheable;
+import com.tcg.admin.client.MisClientService;
 import com.tcg.admin.common.constants.DepartmentConstant;
-import com.tcg.admin.common.constants.IErrorCode;
 import com.tcg.admin.common.constants.LoginConstant;
+import com.tcg.admin.common.constants.TaskStateConstant;
 import com.tcg.admin.common.error.AdminErrorCode;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.common.helper.RequestHelper;
@@ -44,6 +42,7 @@ import com.tcg.admin.service.OperatorService;
 import com.tcg.admin.service.RoleMenuPermissionService;
 import com.tcg.admin.service.RoleService;
 import com.tcg.admin.service.WorkFlowService;
+import com.tcg.admin.to.MerchantChargeTemplateTypeTO;
 import com.tcg.admin.to.NoneAdminInfo;
 import com.tcg.admin.to.OperatorCreateTO;
 import com.tcg.admin.to.TaskTO;
@@ -63,7 +62,7 @@ public class MerchantServiceImpl implements MerchantService {
     
     private static final Comparator<Merchant> MerchantComparator = new Comparator<Merchant>() {
         public int compare(Merchant o1, Merchant o2) {
-            // write comparison logic here like below , it's just a sample
+            // write comparison logic here like below , it's just a sample 
             return o1.getMerchantCode().compareToIgnoreCase(o2.getMerchantCode());
         }
     };
@@ -89,9 +88,6 @@ public class MerchantServiceImpl implements MerchantService {
     private IOperatorProfileRepository operatorProfileRepository;
 
     @Autowired
-    private OperatorLoginService operatorLoginService;
-
-    @Autowired
     private OperatorService operatorService;
 
     @Autowired
@@ -108,110 +104,9 @@ public class MerchantServiceImpl implements MerchantService {
     
     @Autowired
     private RoleMenuPermissionService roleMenuPermissionService;
-
-    @Override
-    @Deprecated
-    public void updateMerchant(Merchant merchant) {
-        try {
-
-            //updateDepartment只能接收狀態為 Normal的紀錄
-            if (merchant.getStatus() == null || merchant.getStatus() != DepartmentConstant.ACTIVE_FLAG_NORMAL.getActiveFlagType()) {
-                throw new AdminServiceBaseException(AdminErrorCode.MERCHANT_ACTIVE_FLAG_OF_INPUT_MUST_BE_NORMAL_ERROR,
-                                                    "updateMerchant dont accept abnormal status");
-            }
-
-            //updateDepartment不接受名稱該改為空白
-            if (StringUtils.isBlank(merchant.getMerchantName())) {
-                throw new AdminServiceBaseException(AdminErrorCode.MERCHANT_NAME_MUST_NOT_BE_EMPTY_ERROR,
-                                                    "updateMerchant dont accept empty name");
-            }
-
-            //依照 merchant 裡面的 merchantId 查詢
-            Merchant merchantFound = merchantRepository.findByMerchantId(merchant.getMerchantId());
-
-            //如果沒有該 merchantId 的 record, 則拋Exception
-            if (merchantFound == null) {
-                throw new AdminServiceBaseException(AdminErrorCode.MERCHANT_NOT_EXIST_ERROR, "merchantId not exists");
-            }
-
-            if (merchant.getParentId() != null && merchant.getParentId().intValue() != 0) {
-                // 依照 merchant 裡面的 parentMerchId 查詢
-                int countByParentMerchId = merchantRepository.countByMerchantId(merchant.getParentId());
-
-                // 如果沒有該 parentMerchId 的 record, 則拋Exception, 因為不允許空頭部門
-                if (countByParentMerchId == 0) {
-                    throw new AdminServiceBaseException(AdminErrorCode.MERCHANT_PARENT_NOT_EXIST_ERROR, "parent merchant not exists");
-                }
-            }
-
-            String trimmedMerchCode = merchant.getMerchantCode().trim();
-
-            //如果傳入merchant 的 merchantName 和 merchant 的 merchantId 查詢到的名稱相同，代表部門名稱沒有要變更
-            if (trimmedMerchCode.equals(merchantFound.getMerchantCode())) {
-
-                //把原本要變更的 description 以及 parentMerchId 設定
-                merchantFound.setMerchantCode(merchant.getMerchantCode());
-                merchantFound.setMerchantName(merchant.getMerchantName());
-                merchantFound.setParentId(merchant.getParentId());
-                merchantRepository.saveAndFlush(merchantFound);
-
-                //如果傳入的部門名稱和DB查詢到的名稱不相同，代表部門名稱有要變更
-            } else {
-
-                //要換的名字，是否已經在DB裡面有紀錄
-                Merchant findByNewCode = merchantRepository.findByMerchantCode(trimmedMerchCode);
-
-                //如果依新名稱查詢，DB有找到
-                if (findByNewCode != null) {
-
-                    //如果有該 foundByNewName 的 record, 且 狀態一樣為Normal 而且還不同 merchantId (因為不得存在狀態都是 Normal 的相同名稱Department)
-                    if (findByNewCode.getStatus() == DepartmentConstant.ACTIVE_FLAG_NORMAL.getActiveFlagType() &&
-                        !findByNewCode.getMerchantId().equals(merchant.getMerchantId())) {
-                        throw new AdminServiceBaseException(AdminErrorCode.MERCHANT_NAME_ALREADY_EXIST_ERROR, "new merchant name already exists");
-                    }
-
-                    //因為之前曾經檢核過，DB是否有相同名稱且狀態為Normal紀錄的存在
-                    //所以就裡在DB裡面的紀錄，一定是狀態不為Normal，只要把  description. parentMerchId 設定, activeFlag設為Normal
-                    findByNewCode.setMerchantCode(merchant.getMerchantCode());
-                    findByNewCode.setMerchantName(merchant.getMerchantName());
-                    findByNewCode.setParentId(merchant.getParentId());
-                    findByNewCode.setStatus(DepartmentConstant.ACTIVE_FLAG_NORMAL.getActiveFlagType());
-                    merchantRepository.saveAndFlush(findByNewCode);
-
-                    //如果 DB裡面有 findByNewName 的紀錄，且 merchantId 不一樣
-                    //要把原本在 input 的 merchant 底下的人員全都搬過去到 findByNewName 底下
-                    //先查詢 US_DEPARTMENT_OPERATOR 紀錄
-                    List<MerchantOperator> opBelongToInputDepartment = merchantOperatorRepository.findByMerchantId(merchant.getMerchantId());
-
-                    //每筆 US_DEPARTMENT_OPERATOR 記錄拿出來更改 merchantId
-                    for (MerchantOperator merchantOp : opBelongToInputDepartment) {
-                        merchantOp.setMerchantId(findByNewCode.getMerchantId());
-                        merchantOperatorRepository.saveAndFlush(merchantOp);
-                    }
-
-                    //把 input 的 merchant 裡面 merchantId 查詢的紀錄，狀態設為刪除
-                    merchantFound.setStatus(DepartmentConstant.ACTIVE_FLAG_DELETED.getActiveFlagType());
-                    merchantRepository.saveAndFlush(merchantFound);
-
-                    //如果依新名稱查詢，DB沒有找到
-                } else {
-
-                    //要變更的 merchantName. description 以及 parentMerchId 設定
-                    merchantFound.setMerchantCode(merchant.getMerchantCode());
-                    merchantFound.setMerchantName(merchant.getMerchantName());
-                    merchantFound.setParentId(merchant.getParentId());
-                    merchantRepository.saveAndFlush(merchantFound);
-
-                }
-
-            }
-
-        } catch (AdminServiceBaseException usbe) {
-            throw usbe;
-        } catch (Exception ex) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
-        }
-    }
+    
+    @Autowired
+    private MisClientService misClientService;
 
     @Override
     public List<Merchant> getMerchantList() {
@@ -220,20 +115,12 @@ public class MerchantServiceImpl implements MerchantService {
     }
 
     @Override
-    public void assignOperatorMerchants(String operatorName, List<Integer> pageMerchantIds) {
+    @MerchantCacheEvict(key="'getMerchants:' + #operator.operatorId")
+    public void assignOperatorMerchants(Operator operator, List<Integer> pageMerchantIds) {
         try {
 
-            /* Operator vaild */
-            //依 operatorName 查詢要指派部門的 Operator
-            Operator operatorFound = operatorRepository.findByOperatorName(operatorName);
-
-            /* operator 是否存在 */
-            //如果查詢不到Operator,拋Exception
-            if (operatorFound == null) {
-                throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_NOT_EXIST_ERROR, "operatorName not exists");
-            }
-            //如果查到的Operator activeFlag 不是 Normal 狀態,拋 Exception
-            if (LoginConstant.ACTIVE_FLAG_LOGIN_SUCCESS.getStatusCode() != operatorFound.getActiveFlag()) {
+            //如果查到的Operator activeFlag 是 删除狀態7,拋 Exception
+            if (LoginConstant.ACTIVE_FLAG_DELETE.getStatusCode() == operator.getActiveFlag()) {
                 throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_ACTIVE_FLAG_ERROR, "operator not normal status");
             }
 
@@ -269,7 +156,7 @@ public class MerchantServiceImpl implements MerchantService {
                 //帳號的merchants
                 List<Integer> accountMerchantList = merchantOperatorRepository.findMerchantIdListByOperatorId(noneAdminInfo.getOperatorId());
                 //指定user的merchants
-                List<Integer> userMerchantList = merchantOperatorRepository.findMerchantIdListByOperatorId(operatorFound.getOperatorId());
+                List<Integer> userMerchantList = merchantOperatorRepository.findMerchantIdListByOperatorId(operator.getOperatorId());
 
                 if(!accountMerchantList.containsAll(userMerchantList)){
                     //保留不包含的部分 + 頁面指定merchants的部分
@@ -279,21 +166,24 @@ public class MerchantServiceImpl implements MerchantService {
             }
 
             //上面所有檢核都通過, 先把原本的  operator-merchant 指派記錄刪除
-            merchantOperatorRepository.deleteByOperatorId(operatorFound.getOperatorId());
+            merchantOperatorRepository.deleteByOperatorId(operator.getOperatorId());
             List<MerchantOperator> merchantOperatorList = new ArrayList<>();
             //新增一個 operator-merchant 指派記錄
             for(int i=0 ; i < pageMerchantIds.size(); i++) {
                 MerchantOperator merchantOperatorRelation = new MerchantOperator();
                 merchantOperatorRelation.setMerchantId(pageMerchantIds.get(i));
-                merchantOperatorRelation.setOperatorId(operatorFound.getOperatorId());
+                merchantOperatorRelation.setOperatorId(operator.getOperatorId());
                 merchantOperatorList.add(merchantOperatorRelation);
             }
             merchantOperatorRepository.save(merchantOperatorList);
+            operator.setUpdateOperator(RequestHelper.getCurrentUser().getUser().getOperatorName());
+            operator.setUpdateTime(new Date());
+            operatorRepository.saveAndFlush(operator);
 
         } catch (AdminServiceBaseException usbe) {
             throw usbe;
         } catch (Exception ex) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
         }
 
     }
@@ -336,6 +226,10 @@ public class MerchantServiceImpl implements MerchantService {
             newOperator.setPassword(operatorFoundById.getPassword());
             newOperator.setActiveFlag(LoginConstant.ACTIVE_FLAG_LOGIN_SUCCESS.getStatusCode());
             newOperator.setNickname(newOperatorName);
+            newOperator.setIsNeedReset(1);
+            newOperator.setCreateTime(new Date());
+            newOperator.setCreateOperator(RequestHelper.getCurrentUser().getUser().getOperatorName());
+            newOperator.setBaseMerchantCode(operatorFoundById.getBaseMerchantCode());
 
             OperatorProfile profile = new OperatorProfile();
             profile.setPageSize(20);
@@ -377,7 +271,7 @@ public class MerchantServiceImpl implements MerchantService {
         } catch (AdminServiceBaseException usbe) {
             throw usbe;
         } catch (Exception ex) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
         }
 
     }
@@ -393,7 +287,7 @@ public class MerchantServiceImpl implements MerchantService {
                 result = merchantRepository.findOne(mercIds.get(0));
             }
         } catch (Exception e) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
         }
         return result;
     }
@@ -407,30 +301,25 @@ public class MerchantServiceImpl implements MerchantService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @Override
     public List<Merchant> queryOperatorMerchants(boolean flag) {
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         Operator user = userInfo.getUser();
         List<Merchant> merchants = this.getAllAdmMerchantList();
-        List<Merchant> resultList = new ArrayList<>();
+
+        //只取正常状态下的merchant
+       // merchants = getNormalMerchant(merchants);
+
+        List<Merchant> resultList = Lists.newLinkedList();
         if (this.checkAdmin(false).isAdmin()) {
             for(Merchant m : merchants) {
-                if(!"9".equals(m.getMerchantType())) {
-                    resultList.add(m);
+                if(checkMerchant(m, flag)) {
+                	resultList.add(m);
                 }
             }
         } else {
             List<Integer> merchantIdList = merchantOperatorRepository.findMerchantIdListByOperatorId(user.getOperatorId());
             for(Merchant m : merchants) {
-                if(merchantIdList.contains(m.getMerchantId()) && !"9".equals(m.getMerchantType())) {
-                    resultList.add(m);
-                }
-            }
-        }
-        //Remove merchant:SYSTEM ,merchantID = 1
-        if(!flag) {
-            for(int i=0;i<resultList.size();i++){
-                Merchant merchant= resultList.get(i);
-                if(merchant.getMerchantId().equals(1)){
-                    resultList.remove(merchant);
+                if(merchantIdList.contains(m.getMerchantId()) && checkMerchant(m, flag)) {
+                	resultList.add(m);
                 }
             }
         }
@@ -438,7 +327,11 @@ public class MerchantServiceImpl implements MerchantService {
         return resultList;
     }
 
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    private boolean checkMerchant(Merchant m, boolean flag) {
+		return !"9".equals(m.getMerchantType()) && (flag || !m.getMerchantId().equals(1));
+	}
+
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
     @Override
     public void renewMerchantList() {
         admMerchantList =  this.getAll();
@@ -464,6 +357,7 @@ public class MerchantServiceImpl implements MerchantService {
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @Override
+    @MerchantCacheable(key="'checkAdmMerchantList'")
     public List<Merchant> checkAdmMerchantList() {
         List<Merchant> merList =  this.getAll();
         if(admMerchantList.size() != merList.size()) {
@@ -482,7 +376,7 @@ public class MerchantServiceImpl implements MerchantService {
     @Override
     public NoneAdminInfo checkAdmin(boolean callByRole) {
         NoneAdminInfo noneAdminInfo = new NoneAdminInfo();
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         Integer operatorId = userInfo.getUser().getOperatorId();
         // the roleIds below to Operator(id)
         List<Integer> roleIds = roleOperatorCustomRepository.findRoleIdListByOperatorId(operatorId);
@@ -527,12 +421,20 @@ public class MerchantServiceImpl implements MerchantService {
             }
 
         } catch (Exception e) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
         }
 
         return operatorDepartmentMap;
     }
 
+
+    @Override
+    public List<Integer> querySubscriptionMerchant(Integer operatorId, boolean admin, Integer userId) {
+        if(admin){
+            return merchantRepository.querySubscriptionMerchantIsAdmin(userId);
+        }
+        return merchantRepository.querySubscriptionMerchantIsNotAdmin(userId, operatorId);
+    }
 
     @Override
     public Merchant getMerchant(Integer merchantId) {
@@ -564,7 +466,7 @@ public class MerchantServiceImpl implements MerchantService {
         } catch (AdminServiceBaseException usbe) {
             throw usbe;
         } catch (Exception ex) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
         }
     }
 
@@ -616,7 +518,7 @@ public class MerchantServiceImpl implements MerchantService {
             this.subscribeUser(gwMerchantId, operatorIdList);
 
             //6. close task
-            UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+            UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
             TaskTO taskTO = new TaskTO();
             taskTO.setTaskId(taskId);
             taskTO.setStateId(201);//
@@ -625,12 +527,12 @@ public class MerchantServiceImpl implements MerchantService {
         } catch (AdminServiceBaseException usbe) {
             throw usbe;
         } catch (Exception ex) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
         }
     }
 
     private Merchant transMerchantVO(OperatorCreateTO operatorCreateTO){
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         Integer opId = userInfo.getUser().getOperatorId();
 
         Merchant merchant = new Merchant();
@@ -666,7 +568,7 @@ public class MerchantServiceImpl implements MerchantService {
         } catch (AdminServiceBaseException usbe) {
             throw usbe;
         } catch (Exception ex) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
         }
     }
 
@@ -706,9 +608,9 @@ public class MerchantServiceImpl implements MerchantService {
         UserInfo<Operator> userInfo;
         TaskTO taskTO = new TaskTO();
         taskTO.setSubsysTaskId(gwMerchantId);
-        taskTO.setStateId(MerchantService.CREATE_MERCHANT_STATE_ID);
+        taskTO.setStateId(TaskStateConstant.CREATE_MERCHANT_STATE_ID);
         taskTO.setTaskDescription(merchantName);
-        userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        userInfo = RequestHelper.getCurrentUser();
         taskTO.setOperatorName(userInfo.getUser().getOperatorName());
         //2.create task
 
@@ -719,9 +621,9 @@ public class MerchantServiceImpl implements MerchantService {
         UserInfo<Operator> userInfo;
         TaskTO taskTO = new TaskTO();
         taskTO.setSubsysTaskId(gwMerchantId);
-        taskTO.setStateId(MerchantService.CREATE_MERCHANT_STATE_ID);
+        taskTO.setStateId(TaskStateConstant.CREATE_MERCHANT_STATE_ID);
         taskTO.setTaskDescription(merchantName);
-        userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        userInfo = RequestHelper.getCurrentUser();
         taskTO.setOperatorName(userInfo.getUser().getOperatorName());
         //2.create task
         return workFlowManager.updateTaskByMerchantId(taskTO,userInfo);
@@ -771,6 +673,37 @@ public class MerchantServiceImpl implements MerchantService {
         }
         merchantOperatorRepository.save(merchantOperatorList);
     }
+    
+    @Override
+    @MerchantCacheEvict(allEntries = true)
+    public void subscribeUser(String merchantCode, List<String> operatorNames, List<Integer> roleIds) {
+        List<Operator> operators = operatorRepository.findByOperatorNameIn(operatorNames);
+        Merchant merchant = merchantRepository.findByMerchantCode(merchantCode);
+        for(Operator op : operators) {
+        	MerchantOperator merchantOperator = merchantOperatorRepository.findByMerchantIdAndOperatorId(merchant.getMerchantId(), op.getOperatorId());
+        	if(merchantOperator == null) {
+        		merchantOperator = new MerchantOperator();
+        		merchantOperator.setMerchantId(merchant.getMerchantId());
+        		merchantOperator.setOperatorId(op.getOperatorId());
+        		merchantOperatorRepository.save(merchantOperator);
+        	}
+        }
+        
+        if(roleIds != null) {
+        	List<RoleOperator> ros = roleOperatorRepository.findAll(roleIds);
+            
+            for(RoleOperator ro : ros) {
+            	MerchantOperator merchantOperator = merchantOperatorRepository.findByMerchantIdAndOperatorId(merchant.getMerchantId(), ro.getOperatorId());
+            	if(merchantOperator == null) {
+            		merchantOperator = new MerchantOperator();
+            		merchantOperator.setMerchantId(merchant.getMerchantId());
+            		merchantOperator.setOperatorId(ro.getOperatorId());
+            		merchantOperatorRepository.save(merchantOperator);
+            	}
+            }
+        }
+        
+    }
 
     @Override
     public void updateMerchant(OperatorCreateTO operatorCreateTO){
@@ -807,12 +740,14 @@ public class MerchantServiceImpl implements MerchantService {
 
 
     public Map<String, Object> getProductInfo(String baseMerchantCode) {
-        List<String> merchatCategory =  merchantMenuCategoryRepository.findMerchantCategoryWithOutSystem(baseMerchantCode);
-        List<String> merchatCategoryList =  menuCategoryRepository.findAllCategoryName();
+        List<String> merchantCategory =  merchantMenuCategoryRepository.findMerchantCategoryWithOutSystem(baseMerchantCode);
+        List<String> merchantCategoryList =  menuCategoryRepository.findAllCategoryName();
+        List<MerchantChargeTemplateTypeTO> merchantTemplateList = misClientService.getMerchantTemplateList(baseMerchantCode);
 
         Map<String, Object> result = new HashMap<>();
-        result.put("merchantCategory", merchatCategory);
-        result.put("merchantCategoryList", merchatCategoryList);
+        result.put("merchantCategory", merchantCategory);
+        result.put("merchantCategoryList", merchantCategoryList);
+        result.put("merchantTemplateList", merchantTemplateList);
         return result;
     }
 
@@ -822,6 +757,10 @@ public class MerchantServiceImpl implements MerchantService {
         List<MerchantMenuCategory> merchatCategory =  merchantMenuCategoryRepository.findMerchantMenuCategoryByMerchantCode(baseMerchantCode);
         merchantMenuCategoryRepository.delete(merchatCategory);
 
+        if(StringUtils.isBlank(operatorCreateTO.getMenuCategoryNames())) {
+        	return;
+        }
+        
         List<String> menuCategoryNameList = Arrays.asList(operatorCreateTO.getMenuCategoryNames().trim().split(","));
 
         List<MenuCategory> list = menuCategoryRepository.findAll(menuCategoryNameList);
@@ -842,4 +781,119 @@ public class MerchantServiceImpl implements MerchantService {
             merchantMenuCategoryRepository.save(saveList);
         }
     }
+
+	@Override
+	public void createMerchant(Merchant company, Merchant merchant, Boolean createCompany) {
+		if(createCompany) {
+			merchantRepository.save(company);
+			roleMenuPermissionService.createAllCategoryRelationFromMerchant(company.getMerchantCode());
+		}
+		merchantRepository.save(merchant);
+		roleMenuPermissionService.createAllCategoryRelationFromMerchant(merchant.getMerchantCode());
+	}
+
+	@Override
+	public Operator createAdminOperator(String merchantCode, List<Integer> roles) {
+		Operator operator = new Operator();
+		String adminName = generateAdminName(merchantCode);
+		Merchant merchant = merchantRepository.findByMerchantCode(merchantCode);
+		
+		operator.setOperatorName(adminName);
+        operator.setNickname(adminName);
+        operator.setActiveFlag(LoginConstant.ACTIVE_FLAG_LOGIN_SUCCESS.getStatusCode());
+        operator.setBaseMerchantCode(merchantCode);
+        operator.setPassword(MD5Utils.encrypt("123456"));
+        operator.setIsNeedReset(1);
+
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
+        operator.setCreateOperator(userInfo.getUser().getOperatorName());
+        operatorRepository.saveAndFlush(operator);
+
+        MerchantOperator merchantOperatorRelation = new MerchantOperator();
+        merchantOperatorRelation.setMerchantId(merchant.getMerchantId());
+        merchantOperatorRelation.setOperatorId(operator.getOperatorId());
+        
+        merchantOperatorRepository.saveAndFlush(merchantOperatorRelation);
+        
+        OperatorProfile profile = new OperatorProfile();
+        profile.setOperatorId(operator.getOperatorId());
+        operatorProfileRepository.saveAndFlush(profile);
+        
+        roleService.assignRoles(operator.getOperatorId(), roles);
+
+        return operator;
+	}
+
+	private String generateAdminName(String merchantCode) {
+		String firstAdminName = merchantCode + "_admin";
+		
+		if(firstAdminName.length() > 16) {
+			firstAdminName = merchantCode + "_adm";
+		}
+		String adminName = firstAdminName;
+		Integer suffix = 0;
+		Integer last = 0;
+		
+		while(operatorRepository.findByOperatorName(adminName) != null) {
+			suffix += 10;
+			last = (int) (Math.random() * 10);
+			adminName = firstAdminName + Integer.toHexString(suffix + last);
+			
+			if(suffix >= 15) {
+				throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_NAME_ERROR, "Can't find admin name for use");
+			}
+		}
+		
+		return adminName;
+	}
+
+	private List<Merchant>getNormalMerchant(List<Merchant> list) {
+        if (CollectionUtils.isEmpty(list)) {
+            return Collections.emptyList();
+        }
+
+        Iterator<Merchant> iterator = list.iterator();
+
+        while (iterator.hasNext()) {
+            //0,停用,1正常，2未审核
+            if (!isEqualsStatus(iterator.next(), 1)) {
+                iterator.remove();
+            }
+        }
+
+        return list;
+    }
+
+    private boolean isEqualsStatus(Merchant merchant,int status) {
+
+        if (null == merchant || null == merchant.getStatus()) {
+            return false;
+        }
+
+        if (merchant.getStatus().intValue() == status) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public List<Merchant> getOperatorMerchant(Operator operator) {
+
+        List<Integer> merchantIdList = merchantOperatorRepository.findMerchantIdListByOperatorId(operator.getOperatorId());
+        if (CollectionUtils.isEmpty(merchantIdList)) {
+            return Collections.emptyList();
+        }
+
+        List<Merchant> merchants = merchantRepository.findAll();
+        //merchants = getNormalMerchant(merchants);
+        List<Merchant> resultList = Lists.newLinkedList();
+        for(Merchant m : merchants) {
+            if(merchantIdList.contains(m.getMerchantId()) && checkMerchant(m, false)) {
+                resultList.add(m);
+            }
+        }
+
+        return resultList;
+    }
+
 }

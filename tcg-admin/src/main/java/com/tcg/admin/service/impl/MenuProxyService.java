@@ -1,6 +1,5 @@
 package com.tcg.admin.service.impl;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -8,11 +7,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.google.common.collect.Lists;
+import com.tcg.admin.cache.RedisCacheEvict;
+import com.tcg.admin.cache.RedisCacheable;
 import com.tcg.admin.model.MenuItem;
+import com.tcg.admin.model.RoleMenuPermission;
 import com.tcg.admin.persistence.springdata.IMenuItemRepository;
 import com.tcg.admin.service.CommonMenuService;
 
@@ -34,12 +37,17 @@ public class MenuProxyService implements CommonMenuService {
 
     @Autowired
     private IMenuItemRepository menuRepository;
+    
+    @Autowired
+    private CacheManager redisCacheManager;
 
     private List<MenuItem> allMenuList = Lists.newLinkedList();
 
     private Map<Integer, MenuItem> allMenuMap = new ConcurrentHashMap<>();
 
     private Map<Integer, List<MenuItem>> wholeMenuTree = new ConcurrentHashMap<>();
+    
+    private List<RoleMenuPermission> adminRoleMenuPermission = Lists.newLinkedList();
 
     @Override
     public  List<MenuItem> getMenuList() {
@@ -68,6 +76,11 @@ public class MenuProxyService implements CommonMenuService {
         }
         return this.wholeMenuTree;
     }
+    
+    @Override
+    public List<RoleMenuPermission> getAdminRoleMenuPermission() {
+    	return adminRoleMenuPermission;
+    }
 
     @Override
     public synchronized void refresh() {
@@ -78,17 +91,27 @@ public class MenuProxyService implements CommonMenuService {
         buildMenuMap();//組MENU的MAP
         wholeMenuTree.clear();
         buildMenuTree();//組完整的目錄樹
+        
+        for(String cacheName : redisCacheManager.getCacheNames()) {
+        	// 除了 shiro, 任务相关 外全部清掉
+        	if(!"tac-auth-redis".equals(cacheName) && !"tac-task-create".equals(cacheName) && !"task-operator-viewers".equals(cacheName) ) {
+        		redisCacheManager.getCache(cacheName).clear();
+        	}
+        }
     }
 
     @Override
     public synchronized void addMenu(MenuItem menu) {
-        menuRepository.saveAndFlush(menu);
-        refresh();
+    	updateAndRefreshMenu(menu);
     }
 
     @Override
     public synchronized void updateMenu(MenuItem menu) {
-        menuRepository.saveAndFlush(menu);
+    	updateAndRefreshMenu(menu);
+    }
+    
+    private synchronized void updateAndRefreshMenu(MenuItem menu) {
+    	menuRepository.saveAndFlush(menu);
         refresh();
     }
 
@@ -103,7 +126,12 @@ public class MenuProxyService implements CommonMenuService {
      */
     private void load() {
         LOGGER.info("===============reload menu!!================");
-        this.allMenuList = menuRepository.findAllOrderByLevelAndDisplayOrderDesc();
+        List<MenuItem> menus = menuRepository.findAllOrderByLevelAndDisplayOrderDesc();
+        List<MenuItem> menuTos = Lists.newLinkedList();
+        for(MenuItem menu : menus) {
+        	menuTos.add(menu.copy());
+        }
+        this.allMenuList = menuTos;
         LOGGER.info("===============reload success!!================");
     }
 
@@ -113,7 +141,8 @@ public class MenuProxyService implements CommonMenuService {
     private void buildMenuMap() {
 
         for (MenuItem menu : allMenuList) {
-            allMenuMap.put(menu.getMenuId(), menu);
+        	MenuItem copyMenu = menu.copy();
+            allMenuMap.put(copyMenu.getMenuId(), copyMenu);
         }
     }
 
@@ -123,11 +152,12 @@ public class MenuProxyService implements CommonMenuService {
     private void buildMenuTree() {
 
         //先加入首層目錄
-        List<MenuItem> rootMenuList = new ArrayList<MenuItem>();
+        List<MenuItem> rootMenuList = Lists.newLinkedList();
         for (MenuItem menu : allMenuList) {
 
             if (menu.getTreeLevel().equals(1)) {
                 rootMenuList.add(menu);
+                adminRoleMenuPermission.add(generateAdminRoleMenuPermission(menu));
             }
         }
         wholeMenuTree.put(0, rootMenuList);
@@ -135,10 +165,11 @@ public class MenuProxyService implements CommonMenuService {
         //逐步加入第二層以後的目錄
         for (MenuItem outterMenu : allMenuList) {
 
-            List<MenuItem> sonMenuList = new ArrayList<MenuItem>();
+            List<MenuItem> sonMenuList = Lists.newLinkedList();
             for (MenuItem innerMenu : allMenuList) {
                 if (innerMenu.getParentId().equals(outterMenu.getMenuId())) {
-                    sonMenuList.add(innerMenu);
+                	adminRoleMenuPermission.add(generateAdminRoleMenuPermission(innerMenu));
+                    sonMenuList.add(innerMenu.copy());
                 }
             }
 
@@ -148,5 +179,12 @@ public class MenuProxyService implements CommonMenuService {
 
         }
     }
+
+	private RoleMenuPermission generateAdminRoleMenuPermission(MenuItem menu) {
+		RoleMenuPermission menuPermission = new RoleMenuPermission();
+		menuPermission.setRoleId(1);
+		menuPermission.setMenuId(menu.getMenuId());
+		return menuPermission;
+	}
 
 }

@@ -1,5 +1,7 @@
 package com.tcg.admin.model;
 
+import java.math.BigDecimal;
+
 import javax.persistence.*;
 
 /**
@@ -20,7 +22,7 @@ public class Merchant extends BaseEntity {
 	@Column(name = "MERCHANT_ID")
 	private Integer merchantId;
 
-	@Column(name = "US_MERCHANT_ID")
+	@Column(name = "US_MERCHANT_ID",nullable = true)
 	private Integer usMerchantId;
 
 
@@ -59,12 +61,25 @@ public class Merchant extends BaseEntity {
 
 	@Column(name = "CREATE_OPERATOR")
 	private Integer createOperator;
-	
+
 	@Column(name = "CURRENCY")
 	private String currency;
 
+    @Column(name = "LEVER_MULTIPLIER")
+    private BigDecimal leverMultiplier;
 
-	public Integer getMerchantId() {
+    @Column(name = "VIRTUAL_CASH_PLEDGE")
+    private BigDecimal virtualCashPledge;
+
+    public BigDecimal getVirtualCashPledge() {
+        return virtualCashPledge;
+    }
+
+    public void setVirtualCashPledge(BigDecimal virtualCashPledge) {
+        this.virtualCashPledge = virtualCashPledge;
+    }
+
+    public Integer getMerchantId() {
 		return merchantId;
 	}
 
@@ -151,9 +166,17 @@ public class Merchant extends BaseEntity {
 	public void setCurrency(String currency) {
 		this.currency = currency;
 	}
-	
-	
 
+    public static long getSerialVersionUID() {
+        return serialVersionUID;
+    }
 
+    public BigDecimal getLeverMultiplier() {
+        return leverMultiplier;
+    }
+
+    public void setLeverMultiplier(BigDecimal leverMultiplier) {
+        this.leverMultiplier = leverMultiplier;
+    }
 }
 

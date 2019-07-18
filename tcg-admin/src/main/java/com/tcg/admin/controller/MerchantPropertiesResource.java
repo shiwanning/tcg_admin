@@ -51,7 +51,7 @@ public class MerchantPropertiesResource {
         
         JsonResponse response = new JsonResponse(true);
         
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         
         MerchantProperties entity = merchantPropertiesService.getMerchantProperties(vo.getMerchantCode());
         

@@ -80,7 +80,7 @@ public class TaskResource {
 						   @RequestParam(value = "pageSize", required = false) int pageSize,
 						   @RequestParam(value = "defStat", required = false) List<String> defStat) {
 		
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         
         List<Integer> merchantIds = Lists.newLinkedList();
         
@@ -138,7 +138,7 @@ public class TaskResource {
 	public JsonResponseT<Object> counterClaimTask(@RequestParam(value = "taskId", required = false) int taskId) {
 
 		JsonResponseT<Object> jsonResponseT = new JsonResponseT<>(true);
-		workflowManager.counterClaimTask(operatorLoginService.getSessionUser(RequestHelper.getToken()), taskId);
+		workflowManager.counterClaimTask(RequestHelper.getCurrentUser(), taskId);
 		try {
 			imService.uploadChanges(taskId, true);
 		} catch (Exception e) {
@@ -149,5 +149,17 @@ public class TaskResource {
 		return jsonResponseT;
 
 	}
+
+
+	@GetMapping("/getTaskInfo")
+	public JsonResponseT<Object> supportMcsTaskInfo(@RequestParam(value = "taskId") int taskId){
+
+		JsonResponseT<Object> jsonResponseT = new JsonResponseT<>(true);
+		Map<String, Object> result = workflowManager.supportMcsTaskInfo(taskId);
+		jsonResponseT.setValue(result);
+		return jsonResponseT;
+
+	}
+
 
 }

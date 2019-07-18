@@ -18,11 +18,10 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.support.SpringBeanAutowiringSupport;
 
-import com.tcg.admin.service.impl.OperatorLoginService;
+import com.tcg.admin.utils.AuthorizationUtils;
 
 @WebFilter(filterName = "authFilter", urlPatterns = "/resources/*")
 @Component
@@ -32,24 +31,28 @@ public class B0SessionAuthorizationFilter implements Filter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(B0SessionAuthorizationFilter.class);
 
+    //MCS 电话系统需要调用/resources/operators/profile/account-name接口验证用户名，
+    // 所以拿掉对于这个接口的token验证，此接口存在数据安全泄漏风险，已跟PM沟通
     private final List<String> ignoreValidateTokenList = Arrays.asList(
+    		"/randy",
             "/_reset_password",
             "/operator_sessions",
             "transfer",
             "/verification",
             "/subsystem",
             "/system/cache",
+            "/version",
             "/auth/google/valid-otp",
-            "/domain/properties");
-
-    @Autowired
-    private OperatorLoginService operatorLoginService;
+            "/domain/properties",
+            "/operators/password_origin",
+            "/auth/google/bind-key-auto",
+            "/operators/profile/account-name");
 
     private Boolean isAutowired = false;
     
     @Override
     public void destroy() {
-
+    	// do nothing
     }
 
     @Override
@@ -63,7 +66,6 @@ public class B0SessionAuthorizationFilter implements Filter {
         HttpServletRequest requestWrapper = (HttpServletRequest) request;
         HttpServletResponse responseWrapper = (HttpServletResponse) response;
 
-
         final String requestUri = requestWrapper.getRequestURI();
 
         if (checkIgnoreList(requestUri, ignoreValidateTokenList)) {
@@ -71,21 +73,19 @@ public class B0SessionAuthorizationFilter implements Filter {
         } else {
             String token = requestWrapper.getHeader(AUTHORIZATION_HEADER);
             try {
-                if (operatorLoginService.isLogin(token)) {
-                    operatorLoginService.touch(token);
+                if (AuthorizationUtils.isLogin(token)) {
+                	AuthorizationUtils.touch(token);
                     filterChain.doFilter(request, response);
-                    if (((HttpServletResponse) response).getStatus() == 401) {
-                        operatorLoginService.logout(token);
-                    }
                 } else {
+                	String responseBody = AuthorizationUtils.isOtherLogin(token) ? "{\"errorCode\":" + "\"KICKED_TOKEN\"}" : "{\"errorCode\":" + "\"INVALID_TOKEN\"}";
                     LOGGER.debug("Login fail [{}] - {}", token, requestUri);
                     responseWrapper.setContentType("application/json");
                     responseWrapper.setStatus(401);
-                    responseWrapper.getWriter().write("");
+                    responseWrapper.getWriter().write(responseBody);
                     responseWrapper.flushBuffer();
                 }
             } catch (Exception e) {
-                LOGGER.error(e.toString(), e);
+                LOGGER.error("login filter error", e);
             }
         }
     }
@@ -105,5 +105,6 @@ public class B0SessionAuthorizationFilter implements Filter {
 
     @Override
     public void init(FilterConfig arg0) throws ServletException {
+    	// do nothing
     }
 }

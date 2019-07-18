@@ -9,7 +9,14 @@ public class TaskTO {
 	private String merchantCode;
 	private String token;
 	private String operatorName;
+	private Boolean close;
 	
+	public Boolean isClose() {
+		return close;
+	}
+	public void setClose(Boolean close) {
+		this.close = close;
+	}
 	public String getSubsysTaskId() {
 		return subsysTaskId;
 	}

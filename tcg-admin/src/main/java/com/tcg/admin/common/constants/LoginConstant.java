@@ -19,6 +19,14 @@ public enum LoginConstant {
      */
 	ACTIVE_FLAG_TERMINATE_LOGIN(2),
 
+
+    /**
+     * 3: Password Login Prohibited
+     * 3: 密码禁止登陆
+     */
+    ACTIVE_FLAG_PASSWORD_LOGIN_PROHIBITED(3),
+
+    ACTIVE_FLAG_SYSTEM_LOGIN_PROHIBITED(4),
     /**
      * 7: User has been deleted.
      * 7: 用戶已被刪除

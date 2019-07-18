@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.tcg.admin.model.MenuItem;
+import com.tcg.admin.model.RoleMenuPermission;
 
 
 /**
@@ -58,5 +59,7 @@ public interface CommonMenuService{
 	 * @return
 	 */
     void refresh();
+
+	List<RoleMenuPermission> getAdminRoleMenuPermission();
 
 }

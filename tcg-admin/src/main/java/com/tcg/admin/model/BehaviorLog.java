@@ -40,6 +40,9 @@ public class BehaviorLog {
 	private Date endProcessDate;
 	@Column (name = "MERCHANT_CODE")
 	private String merchantCode;
+	@Column (name = "REMARK")
+	private String remark;
+
 	
 	public String getIp() {
 		return ip;
@@ -98,4 +101,11 @@ public class BehaviorLog {
 	}
 	public String getMerchantCode() { return merchantCode; }
 	public void setMerchantCode(String merchantCode) { this.merchantCode = merchantCode; }
+	public String getRemark() {
+		return remark;
+	}
+
+	public void setRemark(String remark) {
+		this.remark = remark;
+	}
 }

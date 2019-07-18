@@ -31,7 +31,6 @@ import com.tcg.admin.service.StateService;
 import com.tcg.admin.service.TaskService;
 import com.tcg.admin.service.TransactionService;
 import com.tcg.admin.service.WorkFlowService;
-import com.tcg.admin.service.impl.OperatorLoginService;
 import com.tcg.admin.to.UserInfo;
 import com.tcg.admin.to.response.JsonResponse;
 import com.tcg.admin.to.response.JsonResponseT;
@@ -63,9 +62,6 @@ public class WorkFlowResource {
 
 	@Autowired
 	private TransactionService transactionService;
-
-	@Autowired
-	private OperatorLoginService operatorLoginService;
 	
 	@GetMapping("/states")
 	public JsonResponseT<List<State>> findStates() {
@@ -100,7 +96,7 @@ public class WorkFlowResource {
 	@PostMapping("/createTask")
 	public JsonResponseT<Task> createTask(@RequestBody Task task) {
 		JsonResponseT<Task> response = new JsonResponseT<>(true);
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		String operator = userInfo.getUser().getOperatorId().toString();
 		task.setCreateOperator(operator);
 		task.setUpdateOperator(operator);
@@ -112,7 +108,7 @@ public class WorkFlowResource {
 	@PutMapping("/updateTask")
 	public JsonResponseT<Task> updateTask(@RequestBody Task task) {
 		JsonResponseT<Task> response = new JsonResponseT<>(true);
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		String operator = userInfo.getUser().getOperatorId().toString();
 		task.setUpdateOperator(operator);
 		taskService.updateTask(task);
@@ -136,7 +132,7 @@ public class WorkFlowResource {
 	@PostMapping("/insertTransaction")
 	public JsonResponseT<Transaction> insertTransaction(@RequestBody Transaction transaction) {
 		JsonResponseT<Transaction> response = new JsonResponseT<>(true);
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		String operator = userInfo.getUser().getOperatorId().toString();
 		transaction.setCreateOperator(operator);
 		transaction.setUpdateOperator(operator);
@@ -158,7 +154,7 @@ public class WorkFlowResource {
 	    List<String> stateTypes = getStateTypesFromType(type);
 	    
         JsonResponseT<Map<String, Object>> jsonResponseT = new JsonResponseT<>(true);
-		jsonResponseT.setValue(workFlowManager.getAllAvailableTask(operatorLoginService.getSessionUser(RequestHelper.getToken()), pageNo, maxResult, stateTypes, stateIds));
+		jsonResponseT.setValue(workFlowManager.getAllAvailableTask(RequestHelper.getCurrentUser(), pageNo, maxResult, stateTypes, stateIds));
 		jsonResponseT.setMessage(AdminErrorCode.REQUEST_SUCCESS);
 		
         return jsonResponseT;
@@ -171,7 +167,7 @@ public class WorkFlowResource {
 	    
         JsonResponseT<TaskCountTo> jsonResponseT = new JsonResponseT<>(true);
         
-        UserInfo<Operator> user = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> user = RequestHelper.getCurrentUser();
         
         Map<Integer, Integer> availableTasksCountMap = workFlowManager.getAllAvailableTaskCount(user);
         
@@ -213,7 +209,7 @@ public class WorkFlowResource {
             @RequestParam(value = "maxResult", required = false) int maxResult) {
 
         JsonResponseT<Map<String, Object>> jsonResponseT = new JsonResponseT<>(true);
-		jsonResponseT.setValue(workFlowManager.getTasksOfOperator(operatorLoginService.getSessionUser(RequestHelper.getToken()), pageNo, maxResult));
+		jsonResponseT.setValue(workFlowManager.getTasksOfOperator(RequestHelper.getCurrentUser(), pageNo, maxResult));
         jsonResponseT.setMessage(AdminErrorCode.REQUEST_SUCCESS);
 
         return jsonResponseT;
@@ -230,7 +226,7 @@ public class WorkFlowResource {
             @RequestParam(value = "maxResult", required = false) int maxResult) {
 
         JsonResponseT<Map<String, Object>> jsonResponseT = new JsonResponseT<>(true);
-		jsonResponseT.setValue(workFlowManager.getAllClaimedTasks(operatorLoginService.getSessionUser(RequestHelper.getToken()),pageNo, maxResult));
+		jsonResponseT.setValue(workFlowManager.getAllClaimedTasks(RequestHelper.getCurrentUser(),pageNo, maxResult));
         jsonResponseT.setMessage(AdminErrorCode.REQUEST_SUCCESS);
 
         return jsonResponseT;
@@ -246,7 +242,7 @@ public class WorkFlowResource {
             @RequestParam(value = "taskId", required = false) int taskId) {
 
         JsonResponseT<String> jsonResponseT = new JsonResponseT<>(true);
-        jsonResponseT.setValue(workFlowManager.undertakeTask(operatorLoginService.getSessionUser(RequestHelper.getToken()), taskId));
+        jsonResponseT.setValue(workFlowManager.undertakeTask(RequestHelper.getCurrentUser(), taskId).getUrl());
         jsonResponseT.setMessage(AdminErrorCode.REQUEST_SUCCESS);
 
         return jsonResponseT;
@@ -260,7 +256,7 @@ public class WorkFlowResource {
     public JsonResponseT<Object> withdrawTask(@RequestParam(value = "taskId", required = false) int taskId) {
 
         JsonResponseT<Object> jsonResponseT = new JsonResponseT<>(true);
-        workFlowManager.withdrawTask(operatorLoginService.getSessionUser(RequestHelper.getToken()), taskId);
+        workFlowManager.withdrawTask(RequestHelper.getCurrentUser(), taskId);
         jsonResponseT.setMessage(AdminErrorCode.REQUEST_SUCCESS);
 
         return jsonResponseT;
@@ -274,7 +270,7 @@ public class WorkFlowResource {
     public JsonResponseT<Object> counterClaimTask(@RequestParam(value = "taskId", required = false) int taskId) {
 
         JsonResponseT<Object> jsonResponseT = new JsonResponseT<>(true);
-        workFlowManager.counterClaimTask(operatorLoginService.getSessionUser(RequestHelper.getToken()), taskId);
+        workFlowManager.counterClaimTask(RequestHelper.getCurrentUser(), taskId);
         jsonResponseT.setMessage(AdminErrorCode.REQUEST_SUCCESS);
 
         return jsonResponseT;
@@ -283,7 +279,7 @@ public class WorkFlowResource {
 	
 	@PostMapping("/view/{taskId}")
 	public JsonResponse logView(@RequestHeader(value = "Authorization", required = false) String token, @PathVariable("taskId")Integer taskId){
-		workFlowManager.logViewer(operatorLoginService.getSessionUser(RequestHelper.getToken()), taskId);		
+		workFlowManager.logViewer(RequestHelper.getCurrentUser(), taskId);		
 		return new JsonResponse(true);
 	}
 	

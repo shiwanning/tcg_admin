@@ -1,5 +1,11 @@
 package com.tcg.admin.controller.subsystem;
 
+import com.tcg.admin.common.error.AdminErrorCode;
+import com.tcg.admin.model.Operator;
+import com.tcg.admin.service.OperatorAuthenticationService;
+import com.tcg.admin.to.UserInfo;
+import com.tcg.admin.utils.AuthorizationUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.MediaType;
 
 import java.io.UnsupportedEncodingException;
@@ -29,6 +35,9 @@ public class VerificationResource {
 
     @Autowired
     private VerificationService verificationService;
+    @Autowired
+    private OperatorAuthenticationService operatorAuthenticationService;
+
 
     @PostMapping("/basic")
     public JsonResponse basic(@RequestHeader(value = "Authorization", required = false)  String token, 
@@ -38,7 +47,7 @@ public class VerificationResource {
         
     	String localMerchant = merchant;
     	Integer localMenuId = menuId;
-    	
+
         if(menuId == null) {
             BehaviorRequestWrapper br = (BehaviorRequestWrapper) request;
             String body = br.getBody();
@@ -61,6 +70,19 @@ public class VerificationResource {
             @RequestParam(value = "ip", required = false) String ip, 
             @RequestParam(value = "menuId", required = false) Integer menuId,
             @RequestParam(value = "params", required = false) String params) {
+    	
+    	if(token == null || RequestHelper.getCurrentUser() == null) {
+    		return JsonResponse.FAIL;
+    	}
+
+//    	if(!checkCurrentIp(token,ip)){
+//            JsonResponse jsonResponse = new JsonResponse(false);
+//            jsonResponse.setErrorCode(AdminErrorCode.IP_HAS_CHANGED);
+//            jsonResponse.setMessage(AdminErrorCode.IP_HAS_CHANGED);
+//            operatorAuthenticationService.logout(token);
+//            return jsonResponse;
+//        }
+
         VerificationData verificationData = new VerificationData();
         verificationData.setMenuId(menuId);
         verificationData.setMerchant(merchant);
@@ -72,7 +94,19 @@ public class VerificationResource {
 
     @PostMapping("/advanced")
     public JsonResponse advanced2(@RequestHeader(value = "Authorization", required = false)  String token, @RequestBody VerificationData verificationData) {
-        verificationData.setToken(token);
+    	if(token == null || RequestHelper.getCurrentUser() == null) {
+    		return JsonResponse.FAIL;
+    	}
+
+//        if(!checkCurrentIp(token,verificationData.getIp())){
+//            JsonResponse jsonResponse = new JsonResponse(false);
+//            jsonResponse.setErrorCode(AdminErrorCode.IP_HAS_CHANGED);
+//            jsonResponse.setMessage(AdminErrorCode.IP_HAS_CHANGED);
+//            operatorAuthenticationService.logout(token);
+//            return jsonResponse;
+//        }
+
+    	verificationData.setToken(token);
         return new JsonResponse(verificationService.advanced(verificationData));
     }
 
@@ -156,5 +190,24 @@ public class VerificationResource {
         verificationData.setMerchant(localMerchant);
         verificationData.setToken(token);
         return new JsonResponse(verificationService.merchant(verificationData));
+    }
+
+    private boolean checkCurrentIp(String token,String currentIp) {
+
+        if (StringUtils.isBlank(currentIp) || StringUtils.isBlank(token)) {
+            return false;
+        }
+
+        UserInfo<Operator> userInfo = AuthorizationUtils.getSessionUser(token);
+        if (null == userInfo) {
+            return false;
+        }
+        String lastLoginIp = userInfo.getLoginIp();
+
+        if (currentIp.equals(lastLoginIp)) {
+            return true;
+        }
+
+        return false;
     }
 }

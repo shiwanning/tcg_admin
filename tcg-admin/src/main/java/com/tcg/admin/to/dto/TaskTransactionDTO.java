@@ -1,13 +1,11 @@
 package com.tcg.admin.to.dto;
 
+import java.text.SimpleDateFormat;
+
 import org.apache.commons.lang.StringUtils;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import com.tcg.admin.model.Transaction;
 
-/**
- * Created by chris.h on 2017/7/21.
- */
 public class TaskTransactionDTO {
 
     private Integer taskId;
@@ -25,22 +23,25 @@ public class TaskTransactionDTO {
 
     SimpleDateFormat dt = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
 
-    public TaskTransactionDTO(Integer taskId, String transactionType, String description, String subSystemTask, String status, String stateName, String ownerName, Date createTime, Date openTime, Date closeTime, Date updateTime, String updator) {
-        this.taskId = taskId;
-        this.transactionType = transactionType;
-        this.description = description;
-        this.subSystemTask = subSystemTask;
-        this.status = StringUtils.equals(status, "P") ? "Pending" : StringUtils.equals(status, "O") ? "Open":"Close";
-        this.stateName = stateName;
-        this.ownerName = openTime  != null ? ownerName : "";
-        this.createTime = createTime != null ? dt.format(createTime):"";
-        this.openTime = openTime  != null  ? dt.format(openTime):"";
-        this.closeTime = closeTime  != null ? dt.format(closeTime):"";
-        this.updateTime = updateTime != null ? dt.format(updateTime):"";
-        this.updator = updator;
+    public TaskTransactionDTO(Transaction transaction) {
+    	this.taskId = transaction.getTaskId();
+        this.transactionType = transaction.getTransactionType();
+        this.description = transaction.getDescription();
+        this.subSystemTask = transaction.getSubSystemTask();
+        if(StringUtils.equals(transaction.getStatus(), "P")) {
+        	this.status = "Pending";
+        } else {
+        	this.status = StringUtils.equals(transaction.getStatus(), "O") ? "Open":"Close";
+        }
+        this.stateName = transaction.getStateName();
+        this.ownerName = transaction.getOpenTime()  != null ? transaction.getOwnerName() : "";
+        this.createTime = transaction.getCreateTime() != null ? dt.format(transaction.getCreateTime()):"";
+        this.openTime = transaction.getOpenTime()  != null  ? dt.format(transaction.getOpenTime()):"";
+        this.closeTime = transaction.getCloseTime()  != null ? dt.format(transaction.getCloseTime()):"";
+        this.updateTime = transaction.getUpdateTime() != null ? dt.format(transaction.getUpdateTime()):"";
+        this.updator = transaction.getUpdateOperator();
     }
-
-
+    
     public Integer getTaskId() {
         return taskId;
     }

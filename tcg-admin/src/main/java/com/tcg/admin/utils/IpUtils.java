@@ -1,5 +1,8 @@
 package com.tcg.admin.utils;
 
+import com.tcg.common.util.IPSeeker;
+import com.tcg.common.util.qqwry.IPEntity;
+
 import java.util.regex.Pattern;
 
 public class IpUtils {
@@ -40,5 +43,13 @@ public class IpUtils {
         
         return Pattern.compile(localPattern).matcher(ip).find();
     }
-    
+
+    public static String getArea(String ip){
+        IPEntity seek = IPSeeker.seek(ip);
+        if(seek.getNation() == null && seek.getProvince()!= null && seek.getCity()!= null){
+            return  seek.getCity();
+        }else {
+            return  seek.getNation();
+        }
+    }
 }

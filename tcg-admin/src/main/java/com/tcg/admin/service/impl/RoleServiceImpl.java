@@ -1,9 +1,11 @@
 package com.tcg.admin.service.impl;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
+import com.tcg.admin.common.helper.RequestHelper;
+import com.tcg.admin.model.*;
+import com.tcg.admin.service.*;
+import com.tcg.admin.to.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -15,33 +17,17 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.google.common.collect.Lists;
-import com.tcg.admin.common.constants.IErrorCode;
+import com.tcg.admin.cache.RedisCacheEvict;
 import com.tcg.admin.common.constants.RoleConstant;
 import com.tcg.admin.common.error.AdminErrorCode;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
-import com.tcg.admin.model.CategoryRole;
-import com.tcg.admin.model.MenuItem;
-import com.tcg.admin.model.Operator;
-import com.tcg.admin.model.Role;
-import com.tcg.admin.model.RoleMenuPermission;
-import com.tcg.admin.model.RoleOperator;
 import com.tcg.admin.persistence.RoleOperatorCustomRepository;
 import com.tcg.admin.persistence.springdata.IOperatorRepository;
 import com.tcg.admin.persistence.springdata.IRoleMenuPermissionRepository;
 import com.tcg.admin.persistence.springdata.IRoleOperatorRepository;
 import com.tcg.admin.persistence.springdata.IRoleRepository;
-import com.tcg.admin.service.BpmPermissionService;
-import com.tcg.admin.service.CategoryRoleService;
-import com.tcg.admin.service.MerchantService;
-import com.tcg.admin.service.RoleMenuPermissionService;
-import com.tcg.admin.service.RoleService;
 import com.tcg.admin.service.specifications.OperatorSpecifications;
 import com.tcg.admin.service.specifications.RoleSpecifications;
-import com.tcg.admin.to.NoneAdminInfo;
-import com.tcg.admin.to.QueryOperatorTO;
-import com.tcg.admin.to.QueryRoleTO;
-import com.tcg.admin.to.RoleCreateTO;
-import com.tcg.admin.to.UserInfo;
 import com.tcg.admin.utils.StringTools;
 
 import ch.lambdaj.Lambda;
@@ -76,6 +62,10 @@ public class RoleServiceImpl implements RoleService {
 
 	@Autowired
 	private MerchantService merchantService;
+
+
+	@Autowired
+	private AuthService authService;
 	
 	private static final Integer SUPER_MANAGER_ROLE_ID = 1;
 	
@@ -88,6 +78,7 @@ public class RoleServiceImpl implements RoleService {
 	 */
 	@Override
 	@Transactional(propagation = Propagation.REQUIRED)
+	@RedisCacheEvict(allEntries = true)
 	public void assignRoles(Integer operatorId, List<Integer> roleList) {
 		try {
             /* operator 是否存在 */
@@ -105,6 +96,10 @@ public class RoleServiceImpl implements RoleService {
 			if(oriRoleOperatorList != null && !oriRoleOperatorList.isEmpty() ) {
 				roleOperatorRepository.delete(oriRoleOperatorList);
 			}
+
+			OperatorAuth googleAuth = authService.getGoogleAuth(operatorId);
+
+
             /* 重新設定Operator與role連結關係 */
 			List<RoleOperator> reSetupRoleOperatorList = new ArrayList<>();
 			if(!roleList.isEmpty() ) {
@@ -116,45 +111,57 @@ public class RoleServiceImpl implements RoleService {
 					reSetupRoleOperatorList.add(roleOp);
 				}
 				roleOperatorRepository.save(reSetupRoleOperatorList);
+
+				setGoogleActive(roleList, googleAuth, operatorId);
 			}
+			Operator one = operatorRepository.findOne(operatorId);
+			one.setUpdateTime(new Date());
+			one.setUpdateOperator(RequestHelper.getCurrentUser().getUser().getOperatorName());
+			operatorRepository.saveAndFlush(one);
+
 		} catch (AdminServiceBaseException usbe) {
 			throw usbe;
 		} catch (Exception e) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, e.getMessage(), e);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
 		}
 	}
 
-	@Override
-	public void correlateRoles(Integer operatorId, List<Integer> roleList) {
-		Operator tempOperator = operatorRepository.findOne(operatorId);
+	private void setGoogleActive(List<Integer> roleList, OperatorAuth googleAuth, Integer operatorId){
 
-		try {
-			if (tempOperator == null) {
-				throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_NOT_EXIST_ERROR, "Operator not found!");
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
+//		if(
+//				(!checkRoleListGoogleActive(roleList))
+//						&& googleAuth !=null
+//						&& (googleAuth.getStatus() == OperatorAuth.Status.ACTIVE || googleAuth.getStatus() == OperatorAuth.Status.ORIGIN)
+//						&& googleAuth.getInputType() == OperatorAuth.IsAuto.AUTO ){
+//			if(googleAuth.getStatus() == OperatorAuth.Status.ORIGIN){
+//                authService.deleteByOperatorId(operatorId);
+//			}else{
+//				authService.setGoogleAuthStatus(operatorId, false, true);
+//			}
+//		}else {
+		for (Integer roleId : roleList) {
+			Role byRoleId = roleRepository.findByRoleId(roleId);
+			//
+			if(googleAuth !=null && byRoleId.getGoogleOtpActive() == Role.Status.ACTIVE && googleAuth.getStatus() == OperatorAuth.Status.INACTIVE){
+				authService.setGoogleAuthStatus(operatorId, true, true);
+				break;
+			}else if(googleAuth == null && byRoleId.getGoogleOtpActive() == Role.Status.ACTIVE){
+				authService.generateGoogleAuthBindRole(userInfo, operatorId);
+				break;
 			}
-
-			for (Integer roleId : roleList) {
-				if (roleRepository.findOne(roleId) == null) {
-					throw new AdminServiceBaseException(AdminErrorCode.ROLE_NOT_EXIST_ERROR, "role not found!");
-				}
-			}
-
-			for (Integer roleId : roleList) {
-				RoleOperator roleOp = roleOperatorRepository.findByOperatorIdAndRoleId(operatorId, roleId);
-
-				if (roleOp == null) {
-					roleOp = new RoleOperator();
-					roleOp.setOperatorId(operatorId);
-					roleOp.setRoleId(roleId);
-					roleOperatorRepository.saveAndFlush(roleOp);
-				}
-			}
-		} catch (AdminServiceBaseException usbe) {
-			throw usbe;
-		} catch (Exception e) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
 		}
-
+//		}
+	}
+	private boolean checkRoleListGoogleActive(List<Integer> roleList){
+		boolean onOff = false;
+		for(Integer roleId : roleList){
+			if(roleRepository.findByRoleId(roleId).getGoogleOtpActive() == Role.Status.ACTIVE){
+				onOff = true;
+				break;
+			}
+		}
+		return  onOff;
 	}
 
 	@Override
@@ -173,19 +180,19 @@ public class RoleServiceImpl implements RoleService {
 		} catch (AdminServiceBaseException usbe) {
 			throw usbe;
 		} catch (Exception e) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
 		}
 	}
 
 	@Override
-	public Role createRole(List<Integer> categoryId,String roleName, String description, Integer displayOrder, String updateOperator) {
+	public Role createRole(RoleCreateTO roleTo, String updateOperator) {
 
 		Role result = null;
 
 		try {
 
 			// 依照 roleName 查詢
-			int countByRoleName = roleRepository.countByRoleName(roleName);
+			int countByRoleName = roleRepository.countByRoleName(roleTo.getRoleName());
 
 			// 如果有該 roleName 的 record, 則拋Exception, 因為不允許重複的 roleName
 			if (countByRoleName > 0) {
@@ -196,29 +203,30 @@ public class RoleServiceImpl implements RoleService {
 			// 先查詢所有狀態的Role, 因為之前已經有 select count
 			// 過狀態為Normal的紀錄，如果有紀錄就會拋Exception
 			// 所以這裡查詢出來的紀錄一定會是狀態註記刪除的紀錄或者是查不到
-			result = roleRepository.findByRoleName(roleName);
+			result = roleRepository.findByRoleName(roleTo.getRoleName());
 
 			// 如果查詢不到，代表DB裡面沒有該名稱的紀錄，就宣告一個新的 Role
 			if (result == null) {
 				result = new Role();
-				result.setRoleName(roleName);
+				result.setRoleName(roleTo.getRoleName());
 			}
-			result.setDescription(description);
+			result.setDescription(roleTo.getDescription());
 			result.setActiveFlag(RoleConstant.ACTIVE_FLAG_NORMAL.getActiveFlagType());
-			result.setDisplayOrder(displayOrder);
+			result.setDisplayOrder(roleTo.getDisplayOrder());
+			result.setGoogleOtpActive(roleTo.getGoogleOtpActive());
 			Role role = roleRepository.saveAndFlush(result);
 
 			//設定Role所屬的category
 			List<Integer> roleList = new ArrayList<>();
 			roleList.add(role.getRoleId());
-			categoryRoleService.correlateCategory(categoryId, roleList, updateOperator);
+			categoryRoleService.correlateCategory(roleTo.getCategoryId(), roleList, updateOperator);
 
 			return role;
 
 		} catch (AdminServiceBaseException usbe) {
 			throw usbe;
 		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
 		}
 	}
 
@@ -241,13 +249,48 @@ public class RoleServiceImpl implements RoleService {
 			}
 
 			String trimmedRoleName = roleTo.getRoleName().trim();
-
+			UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 			// 如果傳入 role 的 roleName 和 role 的 roleId 查詢到的名稱相同，代表角色名稱沒有要變更
-			if (trimmedRoleName.equals(roleFound.getRoleName())) {
+			if (trimmedRoleName.equalsIgnoreCase(roleFound.getRoleName().trim())) {
 
 				// 把原本要變更的 description 設定
 				roleFound.setDescription(roleTo.getDescription());
 				roleFound.setDisplayOrder(roleTo.getDisplayOrder());
+				roleFound.setGoogleOtpActive(roleTo.getGoogleOtpActive());
+
+				//先查询出与该角色相关的用户
+				List<RoleOperator> byRoleIdOpList = roleOperatorRepository.findByRoleId(roleTo.getRoleId());
+
+				if(byRoleIdOpList.size() > 0){
+					Iterator<RoleOperator> iterator = byRoleIdOpList.iterator();
+					while(iterator.hasNext()){
+						Integer operatorId = iterator.next().getOperatorId();
+						OperatorAuth googleAuth = authService.getGoogleAuth(operatorId);
+
+						//开启谷歌验证
+						if(roleTo.getGoogleOtpActive() == Role.Status.ACTIVE){
+							if(googleAuth == null){
+								//没有配置谷歌验证，生成谷歌验证，记录为初次创建
+
+								authService.generateGoogleAuthBindRole(userInfo, operatorId);
+							}else if(googleAuth != null && googleAuth.getStatus() == OperatorAuth.Status.INACTIVE){
+								//已经配置了谷歌验证，但是没有开启
+
+								authService.setGoogleAuthStatus(operatorId, true, true);
+							}
+						}
+						else {
+							//关闭谷歌验证
+							//需要看该用户下面的其他角色是否有开启谷歌验证，如果没有开启谷歌验证，则关闭，反之，则不变
+							//未配置，已关闭不管
+
+							if(googleAuth != null && googleAuth.getStatus() == OperatorAuth.Status.ORIGIN){
+								//除了当前角色之外的角色有开启谷歌验证，则不变
+								authService.deleteByOperatorId(operatorId);
+							}
+						}
+					}
+				}
 				roleRepository.saveAndFlush(roleFound);
 
 				// 如果傳入的角色名稱和DB查詢到的名稱不相同，代表角色名稱有要變更
@@ -261,11 +304,7 @@ public class RoleServiceImpl implements RoleService {
 
 					// 如果有該 foundByNewName 的 record, 且 狀態一樣為Normal 而且還不同 roleId
 					// (因為不得存在狀態都是 Normal 的相同名稱Role)
-					if (findByNewName.getActiveFlag() == RoleConstant.ACTIVE_FLAG_NORMAL.getActiveFlagType()
-							&& !findByNewName.getRoleId().equals(roleTo.getRoleId())) {
-						throw new AdminServiceBaseException(AdminErrorCode.ROLE_NAME_ALREADY_EXIST_ERROR,
-								"new role name already exists");
-					}
+					validRole(findByNewName, roleTo);
 
 					// 因為之前曾經檢核過，DB是否有相同名稱且狀態為Normal紀錄的存在
 					// 所以就裡在DB裡面的紀錄，一定是狀態不為Normal，只要把 description設定.
@@ -278,13 +317,7 @@ public class RoleServiceImpl implements RoleService {
 					// 如果 DB裡面有 findByNewName 的紀錄，且 roleId 不一樣
 					// 要把原本在 input 的 role 底下的人員全都搬過去到 findByNewName 底下
 					// 先查詢 US_ROLE_OPERATOR 紀錄
-					List<RoleOperator> havingRoleOperators = roleOperatorRepository.findByRoleId(roleTo.getRoleId());
-
-					// 每筆 US_ROLE_OPERATOR 記錄拿出來更改 roleId
-					for (RoleOperator roleOp : havingRoleOperators) {
-						roleOp.setRoleId(findByNewName.getRoleId());
-						roleOperatorRepository.saveAndFlush(roleOp);
-					}
+					setNewRoleId(roleTo.getRoleId(), findByNewName.getRoleId());
 
 					// 把原本依 department 裡面的 deptId 查詢的紀錄，狀態設為刪除
 					roleFound.setActiveFlag(RoleConstant.ACTIVE_FLAG_DELETED.getActiveFlagType());
@@ -311,7 +344,25 @@ public class RoleServiceImpl implements RoleService {
 		} catch (AdminServiceBaseException usbe) {
 			throw usbe;
 		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
+		}
+	}
+
+	private void validRole(Role findByNewName, RoleCreateTO roleTo) {
+		if (findByNewName.getActiveFlag() == RoleConstant.ACTIVE_FLAG_NORMAL.getActiveFlagType()
+				&& !findByNewName.getRoleId().equals(roleTo.getRoleId())) {
+			throw new AdminServiceBaseException(AdminErrorCode.ROLE_NAME_ALREADY_EXIST_ERROR,
+					"new role name already exists");
+		}
+	}
+
+	private void setNewRoleId(Integer oldRoleId, Integer newRoleId) {
+		List<RoleOperator> havingRoleOperators = roleOperatorRepository.findByRoleId(oldRoleId);
+
+		// 每筆 US_ROLE_OPERATOR 記錄拿出來更改 roleId
+		for (RoleOperator roleOp : havingRoleOperators) {
+			roleOp.setRoleId(newRoleId);
+			roleOperatorRepository.saveAndFlush(roleOp);
 		}
 	}
 
@@ -349,7 +400,19 @@ public class RoleServiceImpl implements RoleService {
 		} catch (AdminServiceBaseException usbe) {
 			throw usbe;
 		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
+		}
+	}
+
+	@Override
+	public Role copyRoleAndConnect(RoleCreateTO copyTo, String operator) {
+		try {
+			Role roleCreated = this.createRole(copyTo,operator);
+			roleMenuPermissionService.correlatePermission(roleCreated.getRoleId(), copyTo.getMenuIdList());
+			return  roleCreated;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return  null;
 		}
 	}
 
@@ -379,7 +442,13 @@ public class RoleServiceImpl implements RoleService {
 			List<Integer> categoryIds = Lambda.extract(categoryRoleList, Lambda.on(CategoryRole.class).getCategoryId());
 
 			// 叫 createRole 新增一個 Role, create時各種判斷邏輯也交由 createRole 處理
-			Role roleCreated = this.createRole(categoryIds,newRoleName, description, displayOrder,updateOperator);
+			RoleCreateTO roleCreateTO = new RoleCreateTO();
+			roleCreateTO.setCategoryId(categoryIds);
+			roleCreateTO.setRoleName(newRoleName);
+			roleCreateTO.setDescription(description);
+			roleCreateTO.setDisplayOrder(displayOrder);
+
+			Role roleCreated = this.createRole(roleCreateTO, updateOperator);
 
 			// originRoleName 擁有的權限
 			List<MenuItem> permissions = roleMenuPermissionService.queryMenuItemsByRole(roleFound.getRoleId());
@@ -398,7 +467,7 @@ public class RoleServiceImpl implements RoleService {
 		} catch (AdminServiceBaseException usbe) {
 			throw usbe;
 		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
 		}
 
 	}
@@ -440,7 +509,7 @@ public class RoleServiceImpl implements RoleService {
 			page = roleRepository.findAll(role, request);
 
 		} catch (Exception e) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
 		}
 
 		return page;
@@ -490,7 +559,7 @@ public class RoleServiceImpl implements RoleService {
 		} catch (AdminServiceBaseException usbe) {
 			throw usbe;
 		} catch (Exception e) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
 		}
 		return result;
 	}
@@ -525,6 +594,8 @@ public class RoleServiceImpl implements RoleService {
 			// operatorId的List
 			queryOperatorTO.setOperatorIdList(operatorIds);
 
+			queryOperatorTO.setNotIncludeActiveFlag(7);
+
 			// 組成where condition 查詢條件
 			Specification<Operator> operator = OperatorSpecifications.queryByConditions(queryOperatorTO);
 
@@ -536,7 +607,7 @@ public class RoleServiceImpl implements RoleService {
 		} catch (AdminServiceBaseException usbe) {
 			throw usbe;
 		} catch (Exception e) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
 		}
 		return result;
 	}
@@ -547,10 +618,10 @@ public class RoleServiceImpl implements RoleService {
 	}
 
 	@Override
+	@Deprecated
 	public List<Role> queryOperatorAllRoles(Operator operator) {
 		List<Role> result = null;
 		try {
-
 			// 用 operatorId 查詢 US_ROLE_OPERATOR 的 roleId
 			List<Integer> roleIds = roleOperatorCustomRepository.findRoleIdListByOperatorId(operator.getOperatorId());
 
@@ -558,7 +629,7 @@ public class RoleServiceImpl implements RoleService {
 			result = roleRepository.findByRoleIds(roleIds);
 
 		} catch (Exception e) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
 		}
 		return result;
 	}
@@ -599,8 +670,7 @@ public class RoleServiceImpl implements RoleService {
 	}
 
 	@Override
-	public Page<Role> queryAllRolesWithParams(int pageNumber, int pageSize, Integer activeFlag, String sortOrder,
-			String sortColumn, String roleName, String description,Integer categoryId) {
+	public Page<Role> queryAllRolesWithParams(int pageNumber, int pageSize, Integer activeFlag, SortTo sortTo, String roleName, String description,Integer categoryId) {
 		Page<Role> page = null;
 		try {
 			// 查詢 US_ROLE 設定條件所需的物件
@@ -622,13 +692,13 @@ public class RoleServiceImpl implements RoleService {
 			// 組成where condition 查詢條件
 			Specification<Role> role = RoleSpecifications.queryByConditions(queryRoleTO);
 
-			Pageable request = new PageRequest(pageNumber - 1, pageSize, "asc".equalsIgnoreCase(sortOrder) ? Sort.Direction.ASC : Sort.Direction.DESC, sortColumn != null ? sortColumn : "roleName");
+			Pageable request = new PageRequest(pageNumber - 1, pageSize, "asc".equalsIgnoreCase(sortTo.getSortOrder()) ? Sort.Direction.ASC : Sort.Direction.DESC, sortTo.getSortBy() != null ? sortTo.getSortBy() : "roleName");
 
 			// 由 roleRepository 做查詢
 			page = roleRepository.findAll(role, request);
 
 		} catch (Exception e) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
 		}
 
 		return page;
@@ -643,4 +713,24 @@ public class RoleServiceImpl implements RoleService {
         return role != null;
     }
 
+	@Override
+	public List<RoleTo> findAllActiveRoles() {
+		List<Object[]> list = roleRepository.findByActiveFlag(1);
+		List<RoleTo> result = Lists.newLinkedList(); 
+		for(Object[] r : list) {
+			RoleTo rt = new RoleTo();
+			
+			rt.setRoleId((Integer) r[0]);
+			rt.setRoleName((String) r[1]);
+			
+			result.add(rt);
+		}
+		
+		return result;
+	}
+
+	@Override
+	public List<Role> findOperatorAllRoleByOperatorId(Integer operatorId) {
+		return roleRepository.findOperatorAllRoleByOperatorId(operatorId);
+	}
 }

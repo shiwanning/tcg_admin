@@ -85,7 +85,7 @@ public class SystemHelperServiceImpl implements SystemHelperService {
     	/*
          * Extract the operator name and operator ID
          * */
-    	UserInfo<Operator> userInfo = operatorLoginService.getSessionUser();
+    	UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
     	String operatorName = userInfo.getUser().getOperatorName();
     	Integer operatorId = userInfo.getUser().getOperatorId();
 
@@ -175,7 +175,7 @@ public class SystemHelperServiceImpl implements SystemHelperService {
      * */
     @Override
     public int updateSystemHelper(SystemHelperTO to) {
-    	UserInfo<Operator> userInfo = operatorLoginService.getSessionUser();
+    	UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
     	String operatorName = userInfo.getUser().getOperatorName();
     	Integer operatorId = userInfo.getUser().getOperatorId();
         SystemHelper model = systemHelperRepository.findOne(to.getMenuId());
@@ -222,7 +222,7 @@ public class SystemHelperServiceImpl implements SystemHelperService {
      * */
 	@Override
 	public SystemHelperTemp approveHelperRequest(SystemHelperTO to) {
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
     	String operatorName = userInfo.getUser().getOperatorName();
     	Integer operatorId = userInfo.getUser().getOperatorId();
     	
@@ -261,7 +261,7 @@ public class SystemHelperServiceImpl implements SystemHelperService {
      * */
 	@Override
 	public SystemHelperTemp rejectHelperRequest(SystemHelperTO to) {
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser();
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
     	String operatorName = userInfo.getUser().getOperatorName();
     	
 		SystemHelperTemp temp = systemHelperTempRepository.findHelperTempByTaskId(to.getTaskId());
@@ -307,7 +307,7 @@ public class SystemHelperServiceImpl implements SystemHelperService {
 	}
 	
 	private List<SystemHelper> filterByPermissionAndContent(List<SystemHelper> result, String query, String lang){
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser();
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		List<Integer> roleIdList = roleOperatorCustomRepository.findRoleIdListByOperatorId(userInfo.getUser().getOperatorId());
 		Set<Integer> menuIdList = roleMenuRepository.findMenuIdListByRoleIdList(roleIdList);
 		boolean isAdmin =  roleIdList.contains(SUPER_MANAGER_ROLE_ID);
@@ -345,7 +345,7 @@ public class SystemHelperServiceImpl implements SystemHelperService {
 	}
 
 	private List<SystemHelper> filterByPermission(List<SystemHelper> result){
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser();
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		List<Integer> roleIdList = roleOperatorCustomRepository.findRoleIdListByOperatorId(userInfo.getUser().getOperatorId());
 		Set<Integer> menuIdList = roleMenuRepository.findMenuIdListByRoleIdList(roleIdList);
 		

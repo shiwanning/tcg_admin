@@ -63,7 +63,7 @@ public interface IMerchantRepository extends JpaRepository<Merchant, Integer> {
     @Query("select d from Merchant d where d.status = 1")
     public List<Merchant> findAllOrderByDisplayOrder();
     
-    @Query("select d from Merchant d")
+    @Query("select d from Merchant d ")
     public List<Merchant> findAllmerchant();
 
     @Query("select d from Merchant d where d.merchantType = ?1")
@@ -75,4 +75,18 @@ public interface IMerchantRepository extends JpaRepository<Merchant, Integer> {
     @Query("select merchant from MerchantMenuCategory merchantMenuCategory, Merchant merchant where merchantMenuCategory.key.merchantCode = merchant.merchantCode and merchantMenuCategory.key.menuCategoryName = (?1)")
     public List<Merchant> findMenuCategoryByMenuCategoryName(String menuCategoryName);
 
+
+
+    @Query(value = " select mercs.merchant_id from tcg_admin.admin_merchant mercs, tcg_admin.us_merchant_operator mercOpers " +
+            " WHERE mercs.merchant_id = mercOpers.merchant_id " +
+            " AND mercOpers.operator_id = ?1 "
+            +" and mercs.merchant_id in (select merchant_id from tcg_admin.us_merchant_operator) ", nativeQuery = true)
+
+    List<Integer> querySubscriptionMerchantIsAdmin(Integer userId);
+
+    @Query(value = " select mercs.merchant_id from tcg_admin.admin_merchant mercs, tcg_admin.us_merchant_operator mercOpers " +
+            " WHERE mercs.merchant_id = mercOpers.merchant_id " +
+            " AND mercOpers.operator_id = ?1 "
+            + " and mercs.merchant_id in (select merchant_id from tcg_admin.us_merchant_operator where operator_id = ?2) ", nativeQuery = true)
+    List<Integer> querySubscriptionMerchantIsNotAdmin(Integer userId, Integer operatorId);
 }

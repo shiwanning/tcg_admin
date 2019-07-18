@@ -1,1 +1,0 @@
-update us_menu_item set access_type = decode(menu_id, 3020, 3, decode(is_button, 0, 0, 1, 2)) where menu_id between 3000 and 3500;

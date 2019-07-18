@@ -65,7 +65,7 @@ public class MerchantWhitelistIpResource {
             return ResponseEntity.badRequest().body(response);
         }
         
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         
         MerchantWhitelistIp entity = new MerchantWhitelistIp();
         
@@ -100,7 +100,7 @@ public class MerchantWhitelistIpResource {
             return ResponseEntity.badRequest().body(response);
         }
         
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         
         entity.setMerchantCode(vo.getMerchantCode());
         entity.setIp(vo.getIp());

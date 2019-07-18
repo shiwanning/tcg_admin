@@ -5,6 +5,7 @@ import java.util.List;
 
 import javax.persistence.QueryHint;
 
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
@@ -26,8 +27,21 @@ public interface IAnnouncementRepository extends JpaRepository<Announcement, Int
     @QueryHints(value={@QueryHint(name=org.hibernate.annotations.QueryHints.CACHEABLE, value="true")})
     List<Announcement> findAllAnnouncement();
 
-    @Query("select an from Announcement an where an.status = 1 and an.startTime < :startTime order by an.startTime desc")
-    @QueryHints(value={@QueryHint(name=org.hibernate.annotations.QueryHints.CACHEABLE, value="true")})
-    List<Announcement> findByStartTimeGreaterThanAndStatus(@Param("startTime") Date date);
+    @Query("select an from Announcement an "
+    		+ " where an.status = 1 "
+    		+ " and an.startTime < :endTime "
+    		+ " and an.startTime > :startTime "
+    		+ " and (an.announcementType = :type or :type = '0') "
+    		+ " order by an.startTime desc")
+    @Cacheable(cacheNames="tac-announcement", key = "'findByStartTimeGreaterThanAndStatusAndType:@' + T(java.util.Objects).hash(#p0,#p1,#p2)")
+    List<Announcement> findByStartTimeGreaterThanAndStatusAndType(@Param("startTime") Date startTime, @Param("endTime") Date endTime, @Param("type") String type);
+
+    @Query("select an from Announcement an "
+    		+ " where an.status = 1 "
+    		+ " and an.startTime < :endTime "
+    		+ " and an.startTime > :startTime "
+    		+ " order by an.startTime desc")
+    @Cacheable(cacheNames="tac-announcement", key = "'findByStartTimeGreaterThanAndStatus:@' + T(java.util.Objects).hash(#p0,#p1)")
+	List<Announcement> findByStartTimeGreaterThanAndStatus(@Param("startTime") Date startTime, @Param("endTime") Date endTime);
     
 }

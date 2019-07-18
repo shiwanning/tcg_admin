@@ -37,8 +37,6 @@ public interface BpmPermissionService {
 	 * @throws AdminServiceBaseException
 	 */
     List<Integer> getBpmCheckListByRole(Integer roleId);
-    
-    List<?> generatePermissionTree(Integer roleId);
 
     Set<String> getBpmGroupKeysByOperator(Operator operator);
 }

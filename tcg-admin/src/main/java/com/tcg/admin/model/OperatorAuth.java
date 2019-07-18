@@ -38,6 +38,13 @@ public class OperatorAuth extends BaseAuditEntity {
     @Column(name = "LAST_PASS_TIME")
     private Date lastPassTime;
 
+    /**
+     *  是否是手动配置， 0：手动，1：自动
+     */
+    @Column(name = "INPUT_TYPE")
+    @Enumerated(EnumType.ORDINAL)
+    private IsAuto inputType;
+
     public Long getRid() {
         return rid;
     }
@@ -85,12 +92,23 @@ public class OperatorAuth extends BaseAuditEntity {
     public void setLastPassTime(Date lastPassTime) {
         this.lastPassTime = lastPassTime;
     }
-    
-    
+
+    public IsAuto getInputType() {
+        return inputType;
+    }
+
+    public void setInputType(IsAuto inputType) {
+        this.inputType = inputType;
+    }
+
     public static enum Status {
         INACTIVE,
-        ACTIVE;
+        ACTIVE,
+        ORIGIN
     }
-    
-    
+
+    public static enum IsAuto{
+        MANUAL,
+        AUTO
+    }
 }

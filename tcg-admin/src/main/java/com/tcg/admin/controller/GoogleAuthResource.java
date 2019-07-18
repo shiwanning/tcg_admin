@@ -2,6 +2,11 @@ package com.tcg.admin.controller;
 
 import java.util.Date;
 
+import com.tcg.admin.common.annotation.OperationLog;
+import com.tcg.admin.common.constants.OperationFunctionConstant;
+import com.tcg.admin.common.exception.AdminServiceBaseException;
+import com.tcg.admin.model.SystemHelperTemp;
+import com.tcg.admin.service.OperatorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +31,7 @@ import com.tcg.admin.to.UserInfo;
 import com.tcg.admin.to.response.AuthInfoTo;
 import com.tcg.admin.to.response.JsonResponse;
 import com.tcg.admin.to.response.JsonResponseT;
-import com.tcg.admin.utils.shiro.OtpUtils;
+import com.tcg.admin.utils.AuthorizationUtils;
 
 @RestController
 @RequestMapping(value = "/resources/auth/google", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -39,11 +44,14 @@ public class GoogleAuthResource {
     
     @Autowired
     private OperatorLoginService operatorLoginService;
+
+    @Autowired
+    private OperatorService operatorService;
     
     @GetMapping("/info")
     public JsonResponseT<AuthInfoTo> getInfo() {
         JsonResponseT<AuthInfoTo> response = new JsonResponseT<>(true);
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         OperatorAuth operatorAuth = authService.getGoogleAuth(userInfo.getUser().getOperatorId());
         if(operatorAuth == null || operatorAuth.getStatus() == OperatorAuth.Status.INACTIVE) {
             response.setValue(new AuthInfoTo(false, userInfo.getOptValidTime()));
@@ -52,11 +60,18 @@ public class GoogleAuthResource {
         }
         return response;
     }
-    
+    @PutMapping("/removeGoogle")
+    @OperationLog(type = OperationFunctionConstant.REMOVE_GOOGLE_VERIFICATION)
+    public JsonResponseT<SystemHelperTemp> removeGoogle( @RequestParam(value = "operatorId", required = false) Integer operatorId) {
+        JsonResponseT<SystemHelperTemp> response = new JsonResponseT<>(true);
+
+        authService.setGoogleAuthStatus(operatorId, false, false);
+        return response;
+    }
     @GetMapping("/key")
     public ResponseEntity<JsonResponseT<String>> getOtp() {
         JsonResponseT<String> response = new JsonResponseT<>(true);
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         
         OperatorAuth operatorAuth = authService.getGoogleAuth(userInfo.getUser().getOperatorId());
         
@@ -67,7 +82,7 @@ public class GoogleAuthResource {
             return ResponseEntity.ok(response);
         } else if(userInfo.getOptValidTime() != null) {
             String key = authService.createNewGoogleAuthKey();
-            userInfo.setGoogleAuthKey(key);
+            AuthorizationUtils.setGoogleAuthKey(userInfo, key);
             key = "otpauth://totp/" + userInfo.getUser().getOperatorName() + "?secret=" + key + "&issuer=TCG";
             response.setValue(key);
             return ResponseEntity.ok(response);
@@ -80,13 +95,17 @@ public class GoogleAuthResource {
     }
     
     @PostMapping("/bind-key")
-    public ResponseEntity<JsonResponse> bindKey(@RequestParam(value = "otp", required = false) String otp) {
+    @OperationLog(type = OperationFunctionConstant.ADD_GOOGLE_VERIFICATION)
+    public ResponseEntity<JsonResponse> bindKey(
+            @RequestParam(value = "otp", required = false) String otp,
+            @RequestParam(value = "isAuto", required = false) boolean isAuto
+            ) {
         
         if(otp == null || Ints.tryParse(otp) == null) {
             return ResponseEntity.badRequest().body(new JsonResponse(false));
         }
         
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         
         String key;
         
@@ -100,10 +119,44 @@ public class GoogleAuthResource {
         boolean isOtpValid = authService.authorize(key, Ints.tryParse(otp));
         
         if(isOtpValid) {
-            authService.activeGoogleAuth(userInfo.getUser().getOperatorId(), key);
+            authService.activeGoogleAuth(userInfo.getUser().getOperatorId(), key, isAuto);
             userInfo.setGoogleAuthKey(null);
         }
         
+        return ResponseEntity.ok().body(new JsonResponse(isOtpValid));
+    }
+
+
+    @PostMapping("/bind-key-auto")
+    @OperationLog(type = OperationFunctionConstant.ADD_GOOGLE_VERIFICATION)
+    public ResponseEntity<JsonResponse> bindKeyAuto(
+            @RequestParam(value = "otp", required = false) String otp,
+            @RequestParam(value = "isAuto", required = false) boolean isAuto,
+            @RequestParam(value = "userName", required = false) String userName
+    ) {
+
+        if(otp == null || Ints.tryParse(otp) == null) {
+            return ResponseEntity.badRequest().body(new JsonResponse(false));
+        }
+
+        Operator operator = operatorService.findOperatorByName(userName);
+        if(operator == null){
+            throw new AdminServiceBaseException(AdminErrorCode.CUSTOMER_NOT_EXIST_ERROR, "Username is not found");
+        }
+
+        OperatorAuth googleAuth = authService.getGoogleAuth(operator.getOperatorId());
+        if(googleAuth == null){
+            throw new AdminServiceBaseException(AdminErrorCode.NOT_BIND_GOOGLE_OTP, "NOT_BIND_GOOGLE_OTP");
+        }
+        String key = googleAuth.getAuthKey();
+        boolean isOtpValid = authService.authorize(key, Ints.tryParse(otp));
+
+
+        if(isOtpValid) {
+            authService.activeGoogleAuthName(operator.getOperatorId(), key, isAuto, userName);
+            AuthorizationUtils.putIsAuthOrigin(operator.getOperatorId(), false);
+            authService.logSuccessLogin(operator.getOperatorId(), userName, operator.getProfile().getLastLoginTime());
+        }
         return ResponseEntity.ok().body(new JsonResponse(isOtpValid));
     }
     
@@ -117,7 +170,7 @@ public class GoogleAuthResource {
         	fixedOtp = Ints.tryParse(otp);
         }
         
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         
         OperatorAuth operatorAuth = authService.getGoogleAuth(userInfo.getUser().getOperatorId());
         
@@ -128,15 +181,18 @@ public class GoogleAuthResource {
         boolean isOtpValid = authService.authorize(operatorAuth.getAuthKey(), fixedOtp);
         int operatorId = userInfo.getUser().getOperatorId();
         if(isOtpValid) {
-            userInfo.setOptValidTime(new Date());
-            if(OtpUtils.isNeedOtp(operatorId)) {
-                OtpUtils.removeErrorCount(operatorId);
+            AuthorizationUtils.setOptValidTime(userInfo, new Date());
+            if(AuthorizationUtils.isNeedOtpToLogin(operatorId)) {
+            	AuthorizationUtils.removeOtpErrorCount(operatorId);
                 operatorLoginService.loginFromOtp(userInfo.getUser().getOperatorId());
-                OtpUtils.removeOtpData(operatorId);
+                AuthorizationUtils.putNotNeedOtp(operatorId);
             }
+            //获取当前登录时间
+            Operator operator = operatorService.findOperatorByName(userInfo.getUser().getOperatorName());
+            authService.logSuccessLogin(operatorId, userInfo.getUser().getOperatorName(), operator.getProfile().getLastLoginTime());
         } else {
-            if(OtpUtils.isNeedOtp(operatorId)) {
-                int errorCount = OtpUtils.addLoginErrorCount(operatorId);
+            if(AuthorizationUtils.isNeedOtpToLogin(operatorId)) {
+                int errorCount = AuthorizationUtils.addOtpErrorCount(operatorId);
                 if(errorCount >= 3) {
                     operatorLoginService.lockUser(userInfo);
                     JsonResponse response = new JsonResponse(false);
@@ -150,14 +206,15 @@ public class GoogleAuthResource {
     }
     
     @PutMapping("/reset-key")
+    @OperationLog(type = OperationFunctionConstant.REMOVE_GOOGLE_VERIFICATION)
     public ResponseEntity<JsonResponse> changeOtpStatus(@RequestParam(value = "operatorId", required = false) Integer operatorId) {
         OperatorAuth operatorAuth = authService.getGoogleAuth(operatorId);
-        if(operatorAuth == null || operatorAuth.getStatus() == OperatorAuth.Status.INACTIVE) {
+        if(operatorAuth == null) {
             JsonResponse jr = new JsonResponse(false);
             jr.setErrorCode("NOT_BIND_OTP");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(jr);
         }
-        authService.setGoogleAuthStatus(operatorId, false);
+        authService.deleteByOperatorId(operatorId);
         return ResponseEntity.ok().body(new JsonResponse(true));
     }
     

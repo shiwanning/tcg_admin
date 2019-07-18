@@ -20,7 +20,9 @@ public class EhcacheUtil {
     // keep hibernate cache
     private static final List<String> DEFAULT_EXCEPT = Collections.singletonList("UpdateTimestampsCache");
 
-    private EhcacheUtil() {}
+    private EhcacheUtil() {
+    	throw new IllegalStateException("Utility class");
+    }
     
     /**
      * no except cache name

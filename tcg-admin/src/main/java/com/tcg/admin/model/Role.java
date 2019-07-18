@@ -47,6 +47,14 @@ public class Role extends BaseEntity {
 	/** 顯示順序 */
 	@Column(name = "DISPLAY_ORDER")
 	private Integer displayOrder;
+
+	/**
+	 *  角色谷歌验证
+	 *  0:未开启 1:开启
+	 */
+	@Column(name = "GOOGLE_OTP_ACTIVE")
+	@Enumerated(EnumType.ORDINAL)
+	private Status googleOtpActive;
 	
 	@OneToMany(fetch=FetchType.EAGER)
 	@JoinColumn(name = "ROLE_ID", insertable = false, updatable = false)
@@ -99,6 +107,17 @@ public class Role extends BaseEntity {
 	public void setCategoryRoles(List<CategoryRole> categoryRoles) {
 		this.categoryRoles = categoryRoles;
 	}
-	
-	
+
+	public Status getGoogleOtpActive() {
+		return googleOtpActive;
+	}
+
+	public void setGoogleOtpActive(Status googleOtpActive) {
+		this.googleOtpActive = googleOtpActive;
+	}
+
+	public static enum Status{
+		INACTIVE,
+		ACTIVE
+	}
 }

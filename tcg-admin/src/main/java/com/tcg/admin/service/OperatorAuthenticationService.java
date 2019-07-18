@@ -39,38 +39,6 @@ public interface OperatorAuthenticationService {
 	 */
     void logout(String token) throws AdminServiceBaseException;
 
-    /**
-	 * Verify the token is valid or not.
-	 * @param token
-	 * @return
-	 * @throws AdminServiceBaseException
-	 */
-    String verifyToken(String token) throws AdminServiceBaseException;
-
-    /**
-	 * Get Session value 
-	 * @param token , Find the session object by the token.
-	 * @param key , The session Key
-	 * @return The session value.
-	 * */
-    Object getSessionValue(String token, String key) throws AdminServiceBaseException;
-
-    /**
-	 * Set Session value 
-	 * @param token , Find the session object by the token.
-	 * @param key , The session Key
-	 * @param value, The object stored in session.
-	 * */
-    void setSessionValue(String token, String key, Object value) throws AdminServiceBaseException;
-
-    //	/**
-//	 * <p>Get user info by token.
-//	 * @param token
-//	 * @return
-//	 * @throws AdminServiceBaseException
-//	 */
-    UserInfo<Operator> getOperatorByToken(String token) throws AdminServiceBaseException;
-
     Boolean checkIdle(String token);
 
 	UserInfo<Operator> loginByGoogleOtp(String username, String password) throws AdminServiceBaseException;

@@ -19,7 +19,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.mysema.query.BooleanBuilder;
 import com.mysema.query.jpa.impl.JPAQuery;
-import com.tcg.admin.common.constants.TaskStatus;
+import com.tcg.admin.common.constants.TaskConstant;
 import com.tcg.admin.model.QStateRelationship;
 import com.tcg.admin.model.QTask;
 import com.tcg.admin.model.Task;
@@ -52,8 +52,8 @@ public class TaskRepositoryCustom extends BaseDAORepository {
 			map.put("roleIds", roleIds);
 		  }
 		List<String> validViewStatus = Lists.newLinkedList();
-		validViewStatus.add(TaskStatus.PROCESSING_STATUS);
-		validViewStatus.add(TaskStatus.OPEN_STATUS);
+		validViewStatus.add(TaskConstant.PROCESSING_STATUS);
+		validViewStatus.add(TaskConstant.OPEN_STATUS);
 		map.put("status", validViewStatus);
 		map.put("owner", 0);
 		if(!stateTypes.isEmpty()) {
@@ -131,7 +131,7 @@ public class TaskRepositoryCustom extends BaseDAORepository {
 		
 		/* values for query */
 		map.put("ids", merchantIds);
-		map.put("status", TaskStatus.OPEN_STATUS);
+		map.put("status", TaskConstant.OPEN_STATUS);
 		map.put("owner", 1);
 		
 		/*process sql string*/
@@ -187,8 +187,8 @@ public class TaskRepositoryCustom extends BaseDAORepository {
 					map.put("taskIds", taskIds);
 				}
 				List<String> validViewStatus = Lists.newLinkedList();
-				validViewStatus.add(TaskStatus.PROCESSING_STATUS);
-				validViewStatus.add(TaskStatus.OPEN_STATUS);
+				validViewStatus.add(TaskConstant.PROCESSING_STATUS);
+				validViewStatus.add(TaskConstant.OPEN_STATUS);
 				map.put("status", validViewStatus);
 				map.put("owner", operatorId);
 
@@ -214,7 +214,7 @@ public class TaskRepositoryCustom extends BaseDAORepository {
 		}
 
 		if (!taskQueryTO.getMerchantIds().isEmpty()) {
-			booleanBuilder.and(QTask.task.merchantId.in((taskQueryTO.getMerchantIds())));
+			booleanBuilder.and(QTask.task.merchantId.in(taskQueryTO.getMerchantIds()));
 		}
 		
 		if(!excludeStateIds.isEmpty()){
@@ -259,9 +259,9 @@ public class TaskRepositoryCustom extends BaseDAORepository {
 	private void andEndDate(String endDate, BooleanBuilder booleanBuilder) {
 		if(StringUtils.isNotEmpty(endDate)) {
 			if(endDate.trim().length() != DATE_WITH_TIME_LENGTH) {
-				booleanBuilder.and(QTask.task.createTime.before(DateTools.getNextDate(DateTools.toDate("yyyy/MM/dd",endDate))));
+				booleanBuilder.and(QTask.task.createTime.before(DateTools.getNextDate(DateTools.parseDate(endDate, "yyyy/MM/dd"))));
 			}else {
-				booleanBuilder.and(QTask.task.createTime.before(DateTools.toDate("yyyy/MM/dd hh:mm:ss",endDate)));
+				booleanBuilder.and(QTask.task.createTime.before(DateTools.parseDate(endDate, "yyyy/MM/dd hh:mm:ss")));
 			}
 		}
 	}
@@ -269,9 +269,9 @@ public class TaskRepositoryCustom extends BaseDAORepository {
 	private void andStartDate(String startDate, BooleanBuilder booleanBuilder) {
 		if(StringUtils.isNotEmpty(startDate)) {
 			if(startDate.trim().length() != DATE_WITH_TIME_LENGTH) {
-				booleanBuilder.and(QTask.task.createTime.after(DateTools.toDate("yyyy/MM/dd", startDate)));
+				booleanBuilder.and(QTask.task.createTime.after(DateTools.parseDate(startDate, "yyyy/MM/dd")));
 			} else {
-				booleanBuilder.and(QTask.task.createTime.after(DateTools.toDate("yyyy/MM/dd hh:mm:ss", startDate)));
+				booleanBuilder.and(QTask.task.createTime.after(DateTools.parseDate(startDate, "yyyy/MM/dd hh:mm:ss")));
 			}
 		}
 	}

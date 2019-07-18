@@ -49,16 +49,22 @@ public class Operator extends UserPrincipal {
 	/** 暱稱 */
 	@Column(name = "NICKNAME")
 	private String nickname;
-
-//    @Column(name = "EMAIL")
-//    private String email;
-
+	
     @OneToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @PrimaryKeyJoinColumn
     private OperatorProfile profile;
 
 	@Column(name = "BASE_MERCHANT_CODE")
 	private String baseMerchantCode;
+
+	@Column(name = "CREATE_OPERATOR")
+	private String createOperator;
+
+	@Column(name = "UPDATE_OPERATOR")
+	private String updateOperator;
+
+	@Column(name = "IS_NEED_RESET")
+	private Integer isNeedReset;
 
     public Integer getOperatorId() {
 		return operatorId;
@@ -76,14 +82,6 @@ public class Operator extends UserPrincipal {
 		this.operatorName = operatorName;
 	}
 
-//	public Integer getMerchantId() {
-//		return deptId;
-//	}
-//
-//	public void setMerchantId(Integer deptId) {
-//		this.deptId = deptId;
-//	}
-
 	public String getNickname() {
 		return nickname;
 	}
@@ -92,14 +90,6 @@ public class Operator extends UserPrincipal {
 		this.nickname = nickname;
 	}
 
-//	public String getEmail() {
-//        return email;
-//    }
-//
-//    public void setEmail(String email) {
-//        this.email = email;
-//    }
-
 
     public OperatorProfile getProfile() {
         return profile;
@@ -107,7 +97,6 @@ public class Operator extends UserPrincipal {
 
     public void setProfile(OperatorProfile profile) {
         this.profile = profile;
-//        profile.setOperator(this);
     }
 
 	public String getBaseMerchantCode() {
@@ -116,5 +105,29 @@ public class Operator extends UserPrincipal {
 
 	public void setBaseMerchantCode(String baseMerchantCode) {
 		this.baseMerchantCode = baseMerchantCode;
+	}
+
+	public String getCreateOperator() {
+		return createOperator;
+	}
+
+	public void setCreateOperator(String createOperator) {
+		this.createOperator = createOperator;
+	}
+
+	public String getUpdateOperator() {
+		return updateOperator;
+	}
+
+	public void setUpdateOperator(String updateOperator) {
+		this.updateOperator = updateOperator;
+	}
+
+	public Integer getIsNeedReset() {
+		return isNeedReset;
+	}
+
+	public void setIsNeedReset(Integer isNeedReset) {
+		this.isNeedReset = isNeedReset;
 	}
 }

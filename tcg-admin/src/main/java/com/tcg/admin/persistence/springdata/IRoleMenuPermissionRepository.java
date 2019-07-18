@@ -51,6 +51,9 @@ public interface IRoleMenuPermissionRepository extends JpaRepository<RoleMenuPer
     @Query("DELETE from RoleMenuPermission p where p.roleId = ?1 and p.menuId in ?2")
     void deleteRoleIdAndMenuIdList(Integer roleId, List<Integer> menuIdList);
 
+    @Modifying
+    @Query("DELETE from RoleMenuPermission p where p.roleId = ?1")
+    void deleteRoleIdAndMenuIdListByRoleId(Integer roleId);
     /**
      * 依roleId來取得對應的資料
      *
@@ -71,6 +74,6 @@ public interface IRoleMenuPermissionRepository extends JpaRepository<RoleMenuPer
     @Query("select p from RoleMenuPermission p where p.menuId in ?1")
     List<RoleMenuPermission> findByMenuId(Integer menuId);
     
-    @Query("select p from RoleMenuPermission p where p.roleId in (?1)")
-    List<RoleMenuPermission> findByRoleIds(List<Integer> roleIds);
+    @Query("select p from RoleMenuPermission p where p.roleId in (?1) and p.roleId != 1")
+    List<RoleMenuPermission> findByRoleIdsWithoutSystem(List<Integer> roleIds);
 }

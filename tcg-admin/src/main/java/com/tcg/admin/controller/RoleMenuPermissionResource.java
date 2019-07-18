@@ -1,26 +1,8 @@
 package com.tcg.admin.controller;
 
-import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.apache.commons.beanutils.BeanUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
+import com.tcg.admin.common.annotation.OperationLog;
+import com.tcg.admin.common.constants.OperationFunctionConstant;
+import com.tcg.admin.common.error.AdminErrorCode;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.common.helper.RequestHelper;
 import com.tcg.admin.controller.json.JsTreeMenu;
@@ -31,12 +13,21 @@ import com.tcg.admin.model.Role;
 import com.tcg.admin.service.BpmPermissionService;
 import com.tcg.admin.service.CommonMenuService;
 import com.tcg.admin.service.MerchantService;
-import com.tcg.admin.service.OperatorAuthenticationService;
 import com.tcg.admin.service.RoleMenuPermissionService;
 import com.tcg.admin.to.TreeTo;
 import com.tcg.admin.to.UserInfo;
 import com.tcg.admin.to.response.JsonResponse;
 import com.tcg.admin.to.response.JsonResponseT;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping(value = "/resources/permissions", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -52,9 +43,6 @@ public class RoleMenuPermissionResource {
 
     @Autowired
     private MerchantService merchantService;
-
-    @Autowired
-    private OperatorAuthenticationService operatorAuthenticationService;
 
     @Autowired
     private BpmPermissionService bpmPermissionService;
@@ -73,27 +61,6 @@ public class RoleMenuPermissionResource {
         return roleMenuPermissionService.queryAllMenuTree();
     }
 
-
-    private List<TreeTo> returnChildList(Map<Integer, List<MenuItem>> result, List<MenuItem> childList) throws InvocationTargetException, IllegalAccessException {
-        List<TreeTo> menuItemLists = new ArrayList<>();
-        for (int i = 0; i < childList.size(); i++) {
-            MenuItem menuItem = childList.get(i);
-            Integer menuId = menuItem.getMenuId();
-
-            //代表有子節點
-            List<MenuItem> subList = result.get(menuId);
-            TreeTo cloneTree = new TreeTo();
-            BeanUtils.copyProperties(cloneTree,menuItem);
-            if (subList != null && !subList.isEmpty()) {
-                cloneTree.setList(this.returnChildList(result, subList));
-            }
-            menuItemLists.add(cloneTree);
-        }
-
-        return menuItemLists;
-    }
-
-
     @GetMapping("/alljson")
     public List<TreeTo> queryAllMenuTreeJson() {
     	return roleMenuPermissionService.getAllTreeTo();
@@ -109,14 +76,13 @@ public class RoleMenuPermissionResource {
      * menuId 3 map to list MenuItem 6
      */
     @GetMapping("/operator/tree/{operatorId}")
-    public Map<Integer, List<MenuItem>> queryMenuTreeByOperator(@PathVariable("operatorId") Integer operatorId) {
+    public Map<String, List<MenuItem>> queryMenuTreeByOperator(@PathVariable("operatorId") Integer operatorId) {
         return roleMenuPermissionService.queryAllMenuTreeByOperator(operatorId);
     }
 
     @GetMapping("/tree")
-    public Map<Integer, List<MenuItem>> queryMenuTreeByToken() {
-        final String token = RequestHelper.getToken();
-        UserInfo<Operator> userInfo = operatorAuthenticationService.getOperatorByToken(token);
+    public Map<String, List<MenuItem>> queryMenuTreeByToken() {
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         return roleMenuPermissionService.queryAllMenuTreeByOperator(userInfo.getUser().getOperatorId());
     }
     /**
@@ -124,11 +90,12 @@ public class RoleMenuPermissionResource {
      */
     @GetMapping("/menu")
     public JsonResponseT<JsTreeMenu> getOperatorJsMenuTree() {
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 
-        final String token = RequestHelper.getToken();
-
-        UserInfo<Operator> userInfo = operatorAuthenticationService.getOperatorByToken(token);
-
+        if(userInfo == null) {
+        	throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_NOT_EXIST_ERROR, "not have current user.");
+        }
+        
         JsonResponseT<JsTreeMenu> result = new JsonResponseT<>();
         result.setValue(roleMenuPermissionService.getOperatorJsMenuTree(userInfo.getUser()));
         result.setSuccess(Boolean.TRUE);
@@ -139,21 +106,36 @@ public class RoleMenuPermissionResource {
     /**
      * 查詢管理員所具有的按鈕權限 
      */
+    @GetMapping("/buttons/permissionGroup")
+    public JsonResponseT<List<Integer>> getOperatorButtonPermissions() {
+
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
+
+        JsonResponseT<List<Integer>> result = new JsonResponseT<>();
+        result.setValue(roleMenuPermissionService.getAllButtonList(userInfo.getUserName()));
+        result.setSuccess(Boolean.TRUE);
+        return result;
+    }
+
+
+
+    /**
+     * 查詢管理員所具有的按鈕權限
+     */
     @GetMapping("/buttons")
-    public JsonResponseT<List<MenuItem>> getOperatorButtonPermissions() {
+    public JsonResponseT<List<MenuItem>> getOperatorButtonPermissionsForService() {
 
-        final String token = RequestHelper.getToken();
-
-        UserInfo<Operator> userInfo = operatorAuthenticationService.getOperatorByToken(token);
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 
         JsonResponseT<List<MenuItem>> result = new JsonResponseT<>();
-        result.setValue(roleMenuPermissionService.getAllButtonList(userInfo.getUserName()));
+        result.setValue(roleMenuPermissionService.getAllButtonListForService(userInfo.getUserName()));
         result.setSuccess(Boolean.TRUE);
 
         return result;
     }
-    
+
     @GetMapping("/{operatorId}/allMenu")
+    @OperationLog(type = OperationFunctionConstant.WATCH_PERMISSIONS)
     public List<TreeTo> queryAllMenuTreeByOperator(@PathVariable("operatorId") Integer operatorId) {
         roleMenuPermissionService.getAllTreeTo(operatorId);
         return roleMenuPermissionService.getAllTreeTo(operatorId);
@@ -161,7 +143,7 @@ public class RoleMenuPermissionResource {
     
     @GetMapping("/menuByOperatorId")
     public List<TreeTo> queryAllMenuTreeByOperatorId() {
-        UserInfo<Operator> userInfo = operatorAuthenticationService.getOperatorByToken(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
         return roleMenuPermissionService.findPermissionOfOperator(userInfo.getUser().getOperatorId(), userInfo);
     }
 
@@ -193,10 +175,9 @@ public class RoleMenuPermissionResource {
      * 建立角色與權限資源的關聯
      */
     @PutMapping("/{roleId}/_correlate_permission")
-	@Deprecated
     public JsonResponse correlatePermission(@PathVariable("roleId") Integer roleId, @RequestBody List<Integer> menuIdList) {
         roleMenuPermissionService.correlatePermission(roleId, menuIdList);
-        return new JsonResponse(true);
+        return JsonResponse.OK;
     }
 
 
@@ -231,7 +212,6 @@ public class RoleMenuPermissionResource {
     public List<Integer> queryRoleByMenuId(@PathVariable("menuId") Integer menuId) {
         return roleMenuPermissionService.queryRolesByMenuId(menuId);
     }
-
 
     /**
      * 更新選單
@@ -275,7 +255,7 @@ public class RoleMenuPermissionResource {
     @GetMapping("/bpmPermission")
     public JsonResponseT<Set<String>> getBpmPermission() {
 
-        UserInfo<Operator> userInfo = operatorAuthenticationService.getOperatorByToken(RequestHelper.getToken());
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 
         Set<String> result = bpmPermissionService.getBpmGroupKeysByOperator(userInfo.getUser());
 

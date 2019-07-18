@@ -1,16 +1,16 @@
 package com.tcg.admin.service;
 
 
+import java.util.List;
+import org.springframework.data.domain.Page;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.model.Operator;
 import com.tcg.admin.model.Role;
 import com.tcg.admin.model.RoleOperator;
 import com.tcg.admin.to.RoleCreateTO;
+import com.tcg.admin.to.RoleTo;
+import com.tcg.admin.to.SortTo;
 import com.tcg.admin.to.UserInfo;
-
-import org.springframework.data.domain.Page;
-
-import java.util.List;
 
 public interface RoleService {
 
@@ -25,18 +25,7 @@ public interface RoleService {
 	 * @throws AdminServiceBaseException
 	 */
 	void assignRoles(Integer operatorId, List<Integer> roleList);
-
-	/**
-	 * <pre>
-	 * to add the relationships between operator and role.
-	 * 
-	 * </pre>
-	 * 
-	 * @param operator, roleList
-	 * @throws AdminServiceBaseException
-	 */
-    void correlateRoles(Integer operatorId, List<Integer> roleList);
-
+	
 	/**
 	 * <pre>
 	 * to remove the relationships between operator and role.
@@ -56,15 +45,9 @@ public interface RoleService {
 	 * 建立角色
 	 * </pre>
 	 * 
-	 * @param roleName
-	 * @param roleDescription
-	 * @param displayOrder
-	 * 
-	 * @return Role
-	 * @throws AdminServiceBaseException
-	 * @see com.yx.us.model.Role
+	 *
 	 */
-    Role createRole(List<Integer> categoryId,String roleName, String description, Integer displayOrder, String updateOperator);
+	Role createRole(RoleCreateTO roleTo, String operator);
 
 	/**
 	 * <pre>
@@ -107,6 +90,10 @@ public interface RoleService {
 	 * @throws AdminServiceBaseException
 	 */
     Role copyRole(String originRoleName, String newRoleName, String description, Integer displayOrder, String updateOperator);
+
+
+
+	Role copyRoleAndConnect(RoleCreateTO copyTo, String operator);
 
     /**
 	 * <pre>
@@ -163,7 +150,7 @@ public interface RoleService {
 	 * 
 	 * @throws AdminServiceBaseException
 	 */
-    Page<Operator> queryOperatorsByRole(String roleName, int pageNumber, int pageSize);
+	Page<Operator> queryOperatorsByRole(String roleName, int pageNumber, int pageSize);
 
 
     Role queryRoleById(Integer roleId);
@@ -173,14 +160,20 @@ public interface RoleService {
 	 * @param operator
 	 * @return
 	 * @throws AdminServiceBaseException
+	 * 包含隐性BUG
 	 */
+	@Deprecated
     List<Role> queryOperatorAllRoles(Operator operator);
     
     void updateDisplayPermissions(Integer roleId, String[] menuIds);
     
     void updateAuditPermissions(Integer roleId, String[] menuIds);
     
-    public Page<Role> queryAllRolesWithParams(int pageNumber, int pageSize, Integer activeFlag, String sortOrder, String sortColumn,String roleName, String description,Integer categoryId);
+    public Page<Role> queryAllRolesWithParams(int pageNumber, int pageSize, Integer activeFlag, SortTo sortTo, String roleName, String description,Integer categoryId);
 
     Boolean isSysAdmin(UserInfo<Operator> userInfo);
+
+	List<RoleTo> findAllActiveRoles();
+
+	List<Role> findOperatorAllRoleByOperatorId(Integer operatorId);
 }

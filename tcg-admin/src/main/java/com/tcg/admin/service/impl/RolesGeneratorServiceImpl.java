@@ -8,6 +8,7 @@ import static ch.lambdaj.Lambda.on;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,11 +37,14 @@ import com.tcg.admin.persistence.springdata.ICategoryRoleRepository;
 import com.tcg.admin.persistence.springdata.IRoleMenuPermissionRepository;
 import com.tcg.admin.persistence.springdata.IRoleOperatorRepository;
 import com.tcg.admin.persistence.springdata.IRoleRepository;
+import com.tcg.admin.service.CommonMenuService;
+import com.tcg.admin.service.MenuItemService;
 import com.tcg.admin.service.RoleMenuPermissionService;
 import com.tcg.admin.service.RolesGeneratorService;
 import com.tcg.admin.to.RoleGeneratorTO;
 import com.tcg.admin.to.TreeTo;
 import com.tcg.admin.to.UserInfo;
+import com.yx.commons.utils.DateUtils;
 
 import ch.lambdaj.group.Group;
 
@@ -60,6 +64,9 @@ public class RolesGeneratorServiceImpl implements RolesGeneratorService {
 	@Autowired
 	private IRoleMenuPermissionRepository roleMenuRepository;
 	
+	@Autowired
+	private CommonMenuService commonMenuService;
+	
 	@Autowired 
 	private OperatorLoginService operatorLoginService;
 	
@@ -71,6 +78,9 @@ public class RolesGeneratorServiceImpl implements RolesGeneratorService {
 	
 	@Autowired
 	private RoleCustomRepository roleCustomRepository;
+	
+	@Autowired
+	private MenuItemService menuItemService;
 	
 	private static final String PREFIX = "roleId_";
 	private static final String MENU_NAME = "menuName";
@@ -103,28 +113,32 @@ public class RolesGeneratorServiceImpl implements RolesGeneratorService {
 	private List<Map<String, Object>> generatePermissionByRoles(List<Integer> rolesIds) {
 		List<Map<String, Object>> responseValue = Lists.newLinkedList();
 		
+		LOGGER.info("1: " + DateUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss.SSS"));
+		
 		/*Build the generic response with all the permission is set to FALSE*/
 		Map<String, Object> defaultMap = this.defaultMap(rolesIds);
 		
 		//TODO: if system should get all menuId
 		/*Fetch all the permissions of each roles and create a group of menu ID to see what is the roles under by each menu ID*/
-		Group<RoleMenuPermission> groupByMenuId = group(roleMenuRepository.findByRoleIds(rolesIds), by(on(RoleMenuPermission.class).getMenuId()));
+		List<RoleMenuPermission> permissions = roleMenuRepository.findByRoleIdsWithoutSystem(rolesIds);
 		
+		if(rolesIds.contains(1)) {
+			permissions.addAll(commonMenuService.getAdminRoleMenuPermission());
+		}
 		
+		Group<RoleMenuPermission> groupByMenuId = group(permissions, by(on(RoleMenuPermission.class).getMenuId()));
+		
+		LOGGER.info("2: " + DateUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss.SSS"));
 		/*Fetch the operator permissions and exist in base merchant menu*/
 		List<TreeTo> operatorPermission = roleMenuPermission.findPermissionOfOperator();
-		
+		LOGGER.info("3: " + DateUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss.SSS"));
 		if(CollectionUtils.isEmpty(operatorPermission)){
 			throw new AdminServiceBaseException(AdminErrorCode.ROLES_NOT_EXIST_ERROR,
 					"Service type has empty pemission");
 		}
 		
 		/*time to assign which role has a permission in each menu*/
-		responseValue = this.generateGenericVariable(responseValue, operatorPermission, groupByMenuId, defaultMap);
-		
-
-		
-		return responseValue;
+		return this.generateGenericVariable(responseValue, operatorPermission, groupByMenuId, defaultMap);
 	}
 	
 	/**
@@ -133,9 +147,11 @@ public class RolesGeneratorServiceImpl implements RolesGeneratorService {
 	private List<Map<String, Object>> generateGenericVariable(List<Map<String, Object>> responseValue, List<TreeTo> operatorPermission, Group<RoleMenuPermission> groupByMenuId, Map<String, Object> defaultMap){
 		if(CollectionUtils.isNotEmpty(operatorPermission)){
 			for(TreeTo tree: operatorPermission){
+				if(tree.getIsInGroup()) {
+					continue;
+				}
 				/*Set up the base objects*/
 				Map<String, Object> value = Maps.newHashMap();
-				value.put(MENU_NAME, tree.getLabels());
 				value.put(MENU_ID, tree.getMenuId());
 				value.put(TREE_LEVEL, tree.getTreeLevel());
 				value.put(PARENT_ID, tree.getParentId());
@@ -143,7 +159,6 @@ public class RolesGeneratorServiceImpl implements RolesGeneratorService {
 				value.put(SHOW, tree.getParentId() == 0);
 				value.put(ICON, tree.getIcon());
 				value.put(CHILD_EXPAND, false);
-				
 				
 				/*Using the default map will do the changes*/
 				 Map<String, Object> mapObject = this.findRoleIdsByMenuId(groupByMenuId, defaultMap, tree.getMenuId());
@@ -159,7 +174,6 @@ public class RolesGeneratorServiceImpl implements RolesGeneratorService {
 				}
 			}
 		}
-		
 		return responseValue;
 	}
 	
@@ -167,11 +181,10 @@ public class RolesGeneratorServiceImpl implements RolesGeneratorService {
 	 * @Description: Will search the menu ID in group and get all the roles that has a permission to menu ID
 	 * */
 	private Map<String, Object> findRoleIdsByMenuId(Group<RoleMenuPermission> groupByMenuId, Map<String, Object> defaultMap, Integer menuId){
-		Map<String, Object> clonedMap = this.deepCopy(defaultMap, new TypeToken<Map<String, Object>>() {}.getType());
 		
+		Map<String, Object> clonedMap = Maps.newHashMap();
 		/* Search in sub group to get the roles that has a permission */
 		List<Integer> rolesWithPermissionInMenuId = extract(groupByMenuId.find(menuId), on(RoleMenuPermission.class).getRoleId()); 
-		
 		if(CollectionUtils.isEmpty(rolesWithPermissionInMenuId)){
 			return Collections.emptyMap();
 		}
@@ -181,10 +194,9 @@ public class RolesGeneratorServiceImpl implements RolesGeneratorService {
 			for(Integer role : rolesWithPermissionInMenuId){
 				Map<String, Object> defVal = Maps.newLinkedHashMap();
 				defVal.put(HAS_PERMISSION, true);
-				clonedMap.put(PREFIX+role, this.hasPermissionDefault(true));
+				clonedMap.put(PREFIX+role, true);
 			}
 		}
-		
 		return clonedMap;
 		
 	}
@@ -231,7 +243,7 @@ public class RolesGeneratorServiceImpl implements RolesGeneratorService {
 	 * */
 	@Override
 	public List<Role> getRolesByUserCategory(){
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		Integer operatorId = userInfo.getUser().getOperatorId();
 		
 		List<Integer> operatorRoles = roleOperatorRepository.findRoleIdListByOperatorId(operatorId);
@@ -275,11 +287,5 @@ public class RolesGeneratorServiceImpl implements RolesGeneratorService {
           return  gson.fromJson(json, type);
 
 	  }
-
-
-	
-
-	
-	
 
 }

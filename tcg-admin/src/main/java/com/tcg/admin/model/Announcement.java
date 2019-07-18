@@ -46,8 +46,14 @@ public class Announcement extends BaseEntity {
     @Column(name = "CN_CONTENT")
     private String cnContent;
 
-    @Column(name = "START_TIME")
+    @Column(name = "MAINTENANCE_START_TIME")
     @NotNull
+    private Date maintenanceStartTime;
+    
+    @Column(name = "MAINTENANCE_END_TIME")
+    private Date maintenanceEndTime;
+    
+    @Column(name = "START_TIME")
     private Date startTime;
 
     @Column(name = "MERCHANTS")
@@ -73,6 +79,12 @@ public class Announcement extends BaseEntity {
     
     @Column(name = "EN_ATTACH_FILE_Url")
     private String enAttachFileUrl;
+    
+    @Column(name = "CREATE_OPERATOR_NAME")
+    private String createOperatorName;
+    
+    @Column(name = "UPDATE_OPERATOR_NAME")
+    private String updateOperatorName;
 
     public Integer getAnnouncementId() {
         return announcementId;
@@ -188,6 +200,38 @@ public class Announcement extends BaseEntity {
 
 	public void setEnAttachFileUrl(String enAttachFileUrl) {
 		this.enAttachFileUrl = enAttachFileUrl;
+	}
+
+	public String getCreateOperatorName() {
+		return createOperatorName;
+	}
+
+	public void setCreateOperatorName(String createOperatorName) {
+		this.createOperatorName = createOperatorName;
+	}
+
+	public String getUpdateOperatorName() {
+		return updateOperatorName;
+	}
+
+	public void setUpdateOperatorName(String updateOperatorName) {
+		this.updateOperatorName = updateOperatorName;
+	}
+
+	public Date getMaintenanceStartTime() {
+		return maintenanceStartTime;
+	}
+
+	public void setMaintenanceStartTime(Date maintenanceStartTime) {
+		this.maintenanceStartTime = maintenanceStartTime;
+	}
+
+	public Date getMaintenanceEndTime() {
+		return maintenanceEndTime;
+	}
+
+	public void setMaintenanceEndTime(Date maintenanceEndTime) {
+		this.maintenanceEndTime = maintenanceEndTime;
 	}
 	
 }

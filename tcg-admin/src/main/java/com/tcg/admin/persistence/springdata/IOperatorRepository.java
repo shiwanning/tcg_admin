@@ -2,6 +2,7 @@ package com.tcg.admin.persistence.springdata;
 
 import java.util.List;
 
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -9,6 +10,29 @@ import com.tcg.admin.model.Operator;
 
 public interface IOperatorRepository extends IUserRepositoryBase<Operator> {
 
+
+
+    @Modifying
+    @Query(value = " update US_OPERATOR uo"
+            + " SET ACTIVE_FLAG = 4,UPDATE_TIME = sysdate, UPDATE_OPERATOR = 'system' "
+            + " WHERE EXISTS("
+            + " SELECT OPERATOR_ID FROM US_OPERATOR_PROFILE uor "
+            + " WHERE uo.OPERATOR_ID = uor.OPERATOR_ID  "
+            + " AND uo.ACTIVE_FLAG <> 7 "
+            + " AND ceil(sysdate - uor.LAST_LOGIN_TIME)> 30 )"
+            ,nativeQuery = true)
+    int updateThirtyNotLoginUser();
+
+
+    @Query("select o.operatorId from Operator o where o.baseMerchantCode = (?1) ")
+    List<Integer> getOperatorsByBaseMerchantId(String baseMerchantCode);
+
+    @Modifying
+    @Query(value = " update US_OPERATOR uo"
+            + " SET ACTIVE_FLAG = (?1),UPDATE_TIME = sysdate, UPDATE_OPERATOR = (?2) "
+            + " WHERE uo.BASE_MERCHANT_CODE = (?3)"
+            ,nativeQuery = true)
+    int updateUsOperatorByMisMerchantStatus(Integer active, String operatorName, String merchantCode);
 
     @Query("select o from Operator o where LOWER(o.operatorName) = LOWER(?1)")
     Operator findByOperatorName(String operatorName);
@@ -54,4 +78,6 @@ public interface IOperatorRepository extends IUserRepositoryBase<Operator> {
     List<Object[]> findByMenuIdPermission(@Param("menuId") Integer menuId);
 
     List<Operator> findByOperatorIdIn(List<Integer> operatorIds);
+
+	List<Operator> findByOperatorNameIn(List<String> operatorNames);
 }

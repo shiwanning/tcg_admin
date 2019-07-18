@@ -1,14 +1,12 @@
 package com.tcg.admin.to.dto;
 
+import java.text.SimpleDateFormat;
+
 import org.apache.commons.lang.StringUtils;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import com.tcg.admin.model.Task;
 
-/**
- * Created by chris.h on 2017/7/21.
- */
-public class TaskDTO {
+public class TaskDto {
 
     private Integer taskId;
     private String subSystemTask;
@@ -18,23 +16,40 @@ public class TaskDTO {
     private String createTime;
     private String openTime;
     private String closeTime;
+    private String description;
     private String ownerName;
 
     SimpleDateFormat dt = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
 
-    public TaskDTO(Integer taskId, String subSystemTask ,String type, String status, String creator, Date createTime, Date openTime, Date closeTime, String ownerName) {
-        this.taskId = taskId;
-        this.subSystemTask = subSystemTask;
-        this.type = type;
-        this.status = StringUtils.equals(status, "P") ? "Pending" : StringUtils.equals(status, "O") ? "Open":"Close";
-        this.creator = creator;
-        this.createTime = createTime != null ? dt.format(createTime):"";
-        this.openTime = openTime  != null  ? dt.format(openTime):"";
-        this.closeTime = closeTime  != null ? dt.format(closeTime):"";
-        this.ownerName = closeTime  != null ? ownerName : "";
+    public TaskDto(Task task) {
+    	this.taskId = task.getTaskId();
+        this.subSystemTask = task.getSubSystemTask();
+        this.type = task.getState().getType();
+        if(StringUtils.equals(task.getStatus(), "P")) {
+        	this.status = "Pending";
+        } else {
+        	this.status = StringUtils.equals(task.getStatus(), "O") ? "Open":"Close";
+        }
+        this.creator = task.getCreateOperator();
+        this.createTime = task.getCreateTime() != null ? dt.format(task.getCreateTime()):"";
+        this.openTime = task.getOpenTime() != null  ? dt.format(task.getOpenTime()):"";
+        this.closeTime = task.getCloseTime() != null ? dt.format(task.getCloseTime()):"";
+        this.ownerName = task.getOwnerName() != null ? task.getOwnerName() : "";
+        this.description = task.getDescription() != null ? task.getDescription() : "";
     }
+    
+    
+    public String getDescription() {
+		return description;
+	}
 
-    public String getSubSystemTask() {
+
+	public void setDescription(String description) {
+		this.description = description;
+	}
+
+
+	public String getSubSystemTask() {
         return subSystemTask;
     }
 

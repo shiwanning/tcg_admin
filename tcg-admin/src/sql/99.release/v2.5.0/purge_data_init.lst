@@ -1,6 +1,0 @@
-TCG_ADMIN_PURGE.tab
-TCG_ADMIN_seq-purge-logs.seq
-TCG_ADMIN_pck-purge-tac-constants.pkg
-TCG_ADMIN_pck-purge-tac-data.pkg
-TCG_ADMIN_pck-purge-tac-data.bdy
-TCG_ADMIN_AddPurgeData.sql

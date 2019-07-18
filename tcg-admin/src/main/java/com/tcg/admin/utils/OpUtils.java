@@ -11,6 +11,12 @@ import com.tcg.admin.model.Operator;
  * US共用檢核方法
  */
 public class OpUtils {
+	
+	
+	private OpUtils() {
+        throw new IllegalStateException("Utility class");
+    }
+	
     /**
      * </pre> Verify front end user name format: 6~14 alphabet letters or
      * numbers.
@@ -83,11 +89,7 @@ public class OpUtils {
      * @return true if the verify pass, false if verify fail.
      */
     public static boolean verifyOperatorPassword(String password) {
-        boolean passed = StringUtils.isNotBlank(password);
-        if (passed) {
-            passed = password.matches("\\w{6,16}");
-        }
-        return passed;
+    	return StringUtils.isNotBlank(password) && password.matches("\\w{6,16}");
     }
 
     /**
@@ -123,9 +125,6 @@ public class OpUtils {
      */
     public static boolean verifyOperatorFields(Operator operator) {
         boolean passed = StringUtils.isNotBlank(operator.getOperatorName()); // 帳號
-//        if (passed) {
-//            passed = StringUtils.isNotBlank(operator.getPassword()); // 密碼
-//        }
         if (passed) {
             passed = StringUtils.isNotBlank(operator.getNickname()); // 暱稱
         }

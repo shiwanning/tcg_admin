@@ -1,21 +1,19 @@
 package com.tcg.admin.to;
 
 import com.tcg.admin.model.ApiLabel;
-import com.tcg.admin.model.BehaviorLog;
 
 import java.util.Date;
 import java.util.List;
 
 public class ActivityLog {
 	
-	private BehaviorLog behaviorLog;
-	
+	private BehaviorLogTo behaviorLog;
 	private List<ApiLabel> labels;
 	
 	public ActivityLog(){
 		super();
 	}
-	public ActivityLog(BehaviorLog behaviorLog,List<ApiLabel> apiLabels){
+	public ActivityLog(BehaviorLogTo behaviorLog,List<ApiLabel> apiLabels){
 		this.behaviorLog = behaviorLog;
 		this.labels=apiLabels;
 	}

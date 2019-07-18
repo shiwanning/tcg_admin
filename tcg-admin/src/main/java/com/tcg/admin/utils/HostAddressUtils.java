@@ -1,11 +1,5 @@
 package com.tcg.admin.utils;
 
-
-
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.util.Enumeration;
 import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
@@ -24,34 +18,7 @@ public class HostAddressUtils {
     private static final List<String> ipHeaders = Lists.newArrayList("X-Forwarded-For", "Proxy-Client-IP", "WL-Proxy-Client-IP", "HTTP_CLIENT_IP", "HTTP_X_FORWARDED_FOR", "X-Real-IP");
     
     private HostAddressUtils() {
-    	
-    }
-    
-    /**
-     * get Local host ip
-     */
-    public static String getLocalHostAddress() {
-        Enumeration<NetworkInterface> interfaces;
-        try {
-            interfaces = NetworkInterface.getNetworkInterfaces();
-            while (interfaces.hasMoreElements()) {
-                NetworkInterface current = interfaces.nextElement();
-                if (!current.isUp() || current.isLoopback() || current.isVirtual()) {
-                    continue;
-                }
-                Enumeration<InetAddress> addresses = current.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress currentAddr = addresses.nextElement();
-                    if (currentAddr.isLoopbackAddress()) {
-                        continue;
-                    }
-                    return currentAddr.getHostAddress();
-                }
-            }
-        } catch (SocketException ignored) {
-        }
-
-        return null;
+    	throw new IllegalStateException("Utility class");
     }
 
     /**

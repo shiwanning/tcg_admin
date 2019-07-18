@@ -1,8 +1,0 @@
---------------------------------------------------------
---  File created - Friday-July-14-2017   
---------------------------------------------------------
---------------------------------------------------------
---  DDL for Sequence SEQ_ANNOUNCEMENT
---------------------------------------------------------
-
-   CREATE SEQUENCE  "TCG_ADMIN"."SEQ_ANNOUNCEMENT"  MINVALUE 1 MAXVALUE 999999999 INCREMENT BY 1 START WITH 5120 CACHE 1000 NOORDER  NOCYCLE  NOKEEP  GLOBAL ;

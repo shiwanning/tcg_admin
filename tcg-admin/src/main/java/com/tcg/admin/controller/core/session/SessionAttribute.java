@@ -1,8 +1,10 @@
 package com.tcg.admin.controller.core.session;
 
-public interface SessionAttribute {
+public final class SessionAttribute {
 
-    String TOKEN = "TOKEN";
-    String OPERATOR_INFO = "OPERATOR_INFO";
-    String IS_LOGIN = "IS_LOGIN";
+    public static final String TOKEN = "TOKEN";
+    public static final String OPERATOR_INFO = "OPERATOR_INFO";
+    public static final String IS_LOGIN = "IS_LOGIN";
+    
+    private SessionAttribute() {}
 }

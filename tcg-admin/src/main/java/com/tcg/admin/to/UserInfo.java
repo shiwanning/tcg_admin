@@ -1,17 +1,21 @@
 package com.tcg.admin.to;
 
+import java.io.Serializable;
 import java.util.Date;
 
 import com.tcg.admin.common.constants.LoginConstant;
 import com.tcg.admin.common.constants.LoginType;
+import com.tcg.admin.model.OperatorAuth;
 
 /**
  * 紀錄登入回覆資訊
  *
  * @author sammy
  */
-public class UserInfo<T> {
+public class UserInfo<T> implements Serializable{
 
+
+    private static final long serialVersionUID = 1L;
     /**
      *
      */
@@ -32,7 +36,7 @@ public class UserInfo<T> {
      */
     private String loginIp;
     
-    private Boolean otpAuthActive;
+    private OperatorAuth.Status otpAuthActive;
     
     private Date lastPassOtpTime;
     
@@ -102,6 +106,8 @@ public class UserInfo<T> {
     private String allCompanies;
     
     private LoginType loginType;
+    
+    private boolean valid = true;
     
     public int getLoginPasswordFailCount() {
         return loginPasswordFailCount;
@@ -270,12 +276,12 @@ public class UserInfo<T> {
     public void setAllMerchants(String allMerchants) {
         this.allMerchants = allMerchants;
     }
-    
-    public Boolean getOtpAuthActive() {
+
+    public OperatorAuth.Status getOtpAuthActive() {
         return otpAuthActive;
     }
 
-    public void setOtpAuthActive(Boolean otpAuthActive) {
+    public void setOtpAuthActive(OperatorAuth.Status otpAuthActive) {
         this.otpAuthActive = otpAuthActive;
     }
 
@@ -311,10 +317,18 @@ public class UserInfo<T> {
         isNeedOtp = isNeedOtp || !loginIp.equals(lastLoginIp);
         isNeedOtp = isNeedOtp || lastPassOtpTime == null;
         isNeedOtp = isNeedOtp || (lastPasswdModifyTime != null && lastPasswdModifyTime.after(this.getLastLoginTime()));
-        return otpAuthActive && isNeedOtp;
+        return otpAuthActive == OperatorAuth.Status.ACTIVE && isNeedOtp;
     }
 
 	public void setLoginType(LoginType loginType) {
 		this.loginType = loginType;
+	}
+
+	public void setValid(boolean valid) {
+		this.valid = valid;
+	}
+	
+	public boolean getValid() {
+		return this.valid;
 	}
 }

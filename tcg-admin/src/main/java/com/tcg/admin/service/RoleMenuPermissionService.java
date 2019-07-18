@@ -45,33 +45,6 @@ public interface RoleMenuPermissionService {
 	 */
     void unCorrelatePermission(Integer roleId, List<Integer> menuIdList);
 
-	/**
-	 * <pre>
-	 * Create a menuItem. For menuItem management.
-	 * 
-	 * 創建權限資源內容
-	 * </pre>
-	 * 
-	 * @param menuItem
-	 * @throws AdminServiceBaseException
-	 * @see com.yx.us.model.MenuItem
-	 */
-    void createMenuItem(MenuItem menuItem);
-
-	/**
-	 * <pre>
-	 * Delete a menuItem.
-	 *
-	 * 刪除權限資源內容
-	 * </pre>
-	 *
-	 * @param menuItemId
-	 * @throws AdminServiceBaseException
-	 * @see com.yx.us.model.MenuItem
-	 */
-    void deleteMenuItem(Integer menuItemId);
-
-
     /**
 	 * <pre>
 	 * Update a menuItem.
@@ -144,7 +117,7 @@ public interface RoleMenuPermissionService {
 	 * @return
 	 * @throws AdminServiceBaseException
 	 */
-    Map<Integer, List<MenuItem>> queryAllMenuTreeByOperator(Integer operatorId);
+    Map<String, List<MenuItem>> queryAllMenuTreeByOperator(Integer operatorId);
 
 	List<TreeTo> queryAllMenuTreeByMenuCategoryName(List<String> menuCategoryNameList);
 
@@ -173,11 +146,11 @@ public interface RoleMenuPermissionService {
 	 * @return
 	 * @throws AdminServiceBaseException
 	 */
-    List<MenuItem> getAllButtonList(String operatorName);
+	List<Integer> getAllButtonList(String operatorName);
+
+	List<MenuItem> getAllButtonListForService(String operatorName);
 
     List<Map<String,String>> getMerchants(UserInfo<Operator> op);
-    
-    void submitEditPermissionForm(MenuItem menuItem);
     
     void saveOrUpdateLabel(ApiLabel apiLabel);
     
@@ -202,4 +175,6 @@ public interface RoleMenuPermissionService {
     List<OperatorInfoTo> findByMenuIdPermission(Integer menuId);
 
 	List<TreeTo> getAllTreeTo(Integer operatorId);
+
+	List<Map<String, String>> getMerchants(Integer operatorId);
 }

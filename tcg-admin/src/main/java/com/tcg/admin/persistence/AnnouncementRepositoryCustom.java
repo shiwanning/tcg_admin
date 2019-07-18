@@ -22,7 +22,6 @@ public class AnnouncementRepositoryCustom {
     private EntityManager entityManager;
 
     private static final Integer ALL = 0;
-    private static final Integer ACTIVE = 1;
     private static final Integer DATE_WITH_TIME_LENGTH = 19;
 
     public Page<Announcement>  find(String startDate, String endDate, String summaryContent, Integer status, Pageable pageable,String announcementType,String vendor) {
@@ -32,13 +31,13 @@ public class AnnouncementRepositoryCustom {
         BooleanBuilder booleanBuilder = new BooleanBuilder();
         if(StringUtils.isNotEmpty(startDate)) {
             if(startDate.trim().length() != DATE_WITH_TIME_LENGTH) {
-                booleanBuilder.and(announcement.startTime.after(DateTools.toDate("MM/dd/yyyy", startDate)));
+                booleanBuilder.and(announcement.startTime.after(DateTools.parseDate(startDate, "MM/dd/yyyy")));
             } else {
-                booleanBuilder.and(announcement.startTime.after(DateTools.toDate("MM/dd/yyyy hh:mm:ss", startDate)));
+                booleanBuilder.and(announcement.startTime.after(DateTools.parseDate(startDate, "MM/dd/yyyy hh:mm:ss")));
             }
         }
         if(StringUtils.isNotEmpty(endDate)) {
-            booleanBuilder.and(announcement.startTime.before(DateTools.getNextDate(DateTools.toDate("MM/dd/yyyy",endDate))));
+            booleanBuilder.and(announcement.startTime.before(DateTools.getNextDate(DateTools.parseDate(endDate, "MM/dd/yyyy"))));
         }
         if(StringUtils.isNotEmpty(summaryContent)) {
             booleanBuilder.and(announcement.enContent.like("%"+summaryContent+"%").or(announcement.enSummary.like("%"+summaryContent+"%"))
@@ -55,15 +54,7 @@ public class AnnouncementRepositoryCustom {
             booleanBuilder.and(announcement.vendor.eq(vendor));
         }
         
-       /* List<String> list = Arrays.asList("foo", "bar", "waa");
-        CharSequence[] cs = list.toArray(new CharSequence[list.size()]);
-        org.apache.commons.lang.StringUtils.indexOf(announcement.merchants, new String[]{'d', 'a'});*/
-        
-        /*List<String> list = Arrays.asList("foo", "bar", "waa");
-        CharSequence[] cs = list.toArray(new CharSequence[list.size()]);
-        StringUtils.inde
-        booleanBuilder.and(announcement.merchants.isEmpty().or(StringUtils.indexOfAny(announcement.merchants, cs)));*/
-        query.from(announcement)
+       query.from(announcement)
                 .where(booleanBuilder)
                 .orderBy(announcement.startTime.desc());
 

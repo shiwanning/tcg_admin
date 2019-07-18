@@ -13,21 +13,6 @@ import java.util.Map;
 
 public interface MerchantService {
 
-	Integer CREATE_MERCHANT_STATE_ID = 200;
-	
-	/**
-	 * <pre>
-	 * Update a department, for role management.
-	 * 
-	 * 修改部門
-	 * </pre>
-	 * 
-	 * @param merchant
-	 *            merchantId, merchantName, description, parentDeptId
-	 * @throws AdminServiceBaseException
-	 */
-    void updateMerchant(Merchant merchant);
-
 	List<Merchant> getMerchantList();
 
 	/**
@@ -53,7 +38,7 @@ public interface MerchantService {
 	 * @param operatorName, merchantId
 	 * @throws AdminServiceBaseException
 	 */
-    void assignOperatorMerchants(String operatorName, List<Integer> merchantIds);
+    void assignOperatorMerchants(Operator operator, List<Integer> merchantIds);
 
     /**
      * <pre>
@@ -116,4 +101,15 @@ public interface MerchantService {
 	Map<String, Object> getProductInfo(String baseMerchantCode);
 
 	void updateProductInfo(OperatorCreateTO operatorCreateTO);
+
+	void createMerchant(Merchant company, Merchant merchant, Boolean createCompany);
+
+	Operator createAdminOperator(String merchantCode, List<Integer> roles);
+
+	void subscribeUser(String merchantCode, List<String> operatorNames, List<Integer> roleIds);
+
+	List<Integer> querySubscriptionMerchant(Integer operatorId, boolean admin, Integer userId);
+
+
+	List<Merchant> getOperatorMerchant(Operator operator);
 }

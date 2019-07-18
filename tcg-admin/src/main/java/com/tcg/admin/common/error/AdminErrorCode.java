@@ -2,6 +2,10 @@ package com.tcg.admin.common.error;
 
 public final class AdminErrorCode {
 	
+	public static final String UNKNOWN_ERROR = "UNKNOWN_ERROR";
+	
+	public static final String UNSUPPORT_ENCODING = "UNSUPPORT_ENCODING";
+	
     public static final String REQUEST_SUCCESS = "REQUEST_SUCCESS";
     /**
      * 取得遠端EJB錯誤
@@ -29,10 +33,34 @@ public final class AdminErrorCode {
      * IP 不可登入
      */
     public static final String IP_NOT_ALLOW = "IP_NOT_ALLOW";
+
+    public static final String  NOT_LOGIN_BEEN_THIRTY_DAYS = "NOT_LOGIN_BEEN_THIRTY_DAYS";
+
+    /**
+     * 用户登录IP跟当前IP不匹配
+     */
+    public static final String IP_HAS_CHANGED = "IP_HAS_CHANGED";
+
+    /**
+     *  未绑定谷歌，不允许登入
+     */
+    public static final String  GOOGLE_AUTHENTICATION_IS_NOT_SETUP = "GOOGLE_AUTHENTICATION_IS_NOT_SETUP";
+
     /**
      * 帐号或密碼錯誤
      */
     public static final String INCORRECT_USERNAME_PWD_ERROR = "US_INCORRECT_USERNAME_PASSWORD_ERROR";
+
+    /**
+     * 帐号不存在
+     */
+    public static final String USER_NOT_EXIST = "USER_NOT_EXIST";
+
+    /**
+     * 谷歌认证密碼錯誤
+     */
+    public static final String INCORRECT_GOOGLE_PWD_ERROR = "US_INCORRECT_GOOGLE_PWD_ERROR";
+
     /**
      * 没绑定谷歌账号
      */
@@ -120,6 +148,8 @@ public final class AdminErrorCode {
      * 有必填欄位未填
      */
     public static final String CUSTOMER_INPUT_FIELD_REQUIRE_ERROR = "US_CUSTOMER_INPUT_FIELD_REQUIRE_ERROR";
+
+    public static final String PROHIBIT_PASSWORD_123456 = "PROHIBIT_PASSWORD_123456";
     /**
      * 輸入欄位與確認欄位內容不符
      */
@@ -363,6 +393,11 @@ public final class AdminErrorCode {
      * Operator activeFlag 不是 Normal 狀態
      */
     public static final String OPERATOR_ACTIVE_FLAG_ERROR = "US_OPERATOR_ACTIVE_FLAG_ERROR";
+
+    /**
+     * 密码禁止登陆
+     */
+    public static  final String OPERATOR_LOGIN_PROHIBITED = "US_OPERATOR_ACTIVE_FLAG_PASSWORD_LOGIN_PROHIBITED_ERROR";
     /**
      * 後台管理員暱稱格式錯誤
      */
@@ -614,6 +649,19 @@ public final class AdminErrorCode {
     public static final String MENU_CATEGORY_ALREADY_EXIST = "MENU_CATEGORY_ALREADY_EXIST";
     public static final String MENU_BUTTON_MUST_EXIST = "MENU_BUTTON_MUST_EXIST";
     public static final String ALERADY_BIND = "ALERADY_BIND";
+
+    public static final String REVIEW_TEMPLATE_EXIST = "REVIEW_TEMPLATE_EXIST";
+    public static final String REVIEW_TEMPLATE_NON_EXIST = "REVIEW_TEMPLATE_NON_EXIST";
+    public static final String TEMPLATE_CONTENT_DUPLICATE = "TEMPLATE_CONTENT_DUPLICATE";
+    public static final String TEMPLATE_DETAIL_EMPTY = "TEMPLATE_DETAIL_EMPTY";
+    public static final String TEMPLATE_NAME_DUPLICATE = "TEMPLATE_NAME_DUPLICATE";
+
+    public static final String JSON_ERR = "JSON_ERR";
+
+    // 金额不对
+	public static final String AMOUNT_INVALID = "AMOUNT_INVALID";
+
+	public static final String OPERATOR_NAME_ERROR = "OPERATOR_NAME_ERROR";
     
 	private AdminErrorCode() {
 		throw new IllegalStateException("Utility class");

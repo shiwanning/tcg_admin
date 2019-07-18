@@ -10,7 +10,7 @@ import com.tcg.admin.model.MenuCategory;
 public interface IMenuCategoryRepository extends JpaRepository<MenuCategory, String> {
 	
 	@Query("select menuCategory from MenuCategory menuCategory where menuCategory.categoryName = (?1)")
-	List<MenuCategory> findMenuCategoryByMenuCategoryName(String categoryName);
+	MenuCategory findMenuCategoryByMenuCategoryName(String categoryName);
 
 	@Query("select menuCategory.categoryName from MenuCategory menuCategory where menuCategory.categoryName != 'SYSTEM' ")
 	List<String> findAllCategoryName();

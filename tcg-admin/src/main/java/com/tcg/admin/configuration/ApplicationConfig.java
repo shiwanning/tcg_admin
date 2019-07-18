@@ -1,10 +1,6 @@
 package com.tcg.admin.configuration;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.PropertySource;
+import org.springframework.context.annotation.*;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.multipart.commons.CommonsMultipartResolver;
@@ -15,9 +11,10 @@ import org.springframework.web.multipart.commons.CommonsMultipartResolver;
  */
 @Configuration
 @ComponentScan(basePackages = {"com.tcg.admin"})
-@Import({SwaggerConfig.class, CommonConfig.class, DatabaseConfig.class, CacheConfig.class, ShiroConfig.class})
-@PropertySource({"classpath:environment.properties"})
+@Import({SwaggerConfig.class, CommonConfig.class, DatabaseConfig.class, CacheConfig.class})
+@PropertySource({"classpath:environment.properties", "classpath:redis_config.properties"})
 @EnableScheduling
+@EnableAspectJAutoProxy
 public class ApplicationConfig {
 
     @Bean

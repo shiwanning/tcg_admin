@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.tcg.admin.common.constants.IErrorCode;
 import com.tcg.admin.common.error.AdminErrorCode;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.model.Category;
@@ -39,7 +38,7 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public List<Category> queryCategory() {
-        return categoryRepository.findAll();
+        return categoryRepository.findAllOrderByCatregoryName();
     }
 
     @Override
@@ -64,7 +63,7 @@ public class CategoryServiceImpl implements CategoryService {
                 queryList.add(newQueryCategoriesTO);
             }
         } catch (Exception ex) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
         }
         return queryList;
     }
@@ -105,7 +104,7 @@ public class CategoryServiceImpl implements CategoryService {
         } catch (AdminServiceBaseException usbe) {
             throw usbe;
         } catch (Exception ex) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
         }
     }
 

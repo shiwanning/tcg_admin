@@ -44,9 +44,9 @@ public class TcgAdminExceptionHandler {
         		LOGGER.error("API failed: {}. ErrorCode: {} ErrorMessage: {}.",req.getRequestURI(), errorCode, message);
         	}
         } else {
-            jsonResponse.setErrorCode("UNKNOWN_ERROR");
+            jsonResponse.setErrorCode(AdminErrorCode.UNKNOWN_ERROR);
             jsonResponse.setMessage(exception.getMessage());
-            LOGGER.info("API failed: {}", req.getServletPath());
+            LOGGER.info("API failed: {}", req.getRequestURI());
         }
 
         if(!isInfoLevel) {

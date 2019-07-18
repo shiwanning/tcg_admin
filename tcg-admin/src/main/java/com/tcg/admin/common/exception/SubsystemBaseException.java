@@ -2,7 +2,7 @@ package com.tcg.admin.common.exception;
 
 import org.apache.commons.lang3.StringUtils;
 
-import com.tcg.admin.common.constants.IErrorCode;
+import com.tcg.admin.common.error.AdminErrorCode;
 
 public class SubsystemBaseException extends RuntimeException implements IErrorBaseException {
 
@@ -22,7 +22,7 @@ public class SubsystemBaseException extends RuntimeException implements IErrorBa
 
     public SubsystemBaseException(String description) {
         super(description);
-        this.errorCode = IErrorCode.UNKNOWN_ERROR;
+        this.errorCode = AdminErrorCode.UNKNOWN_ERROR;
     }
 
     public SubsystemBaseException(String errorCode, Throwable throwable) {

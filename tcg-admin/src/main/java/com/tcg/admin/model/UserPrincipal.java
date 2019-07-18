@@ -29,6 +29,13 @@ public class UserPrincipal extends BaseEntity {
      */
     @Column(name = "ERROR_COUNT")
     private Integer errorCount = 0;
+
+
+    /**
+     * GOOGLE登入錯誤次數
+     */
+    @Column(name = "GOOGLE_ERROR_COUNT")
+    private Integer googleErrorCount = 0;
     
     /**
      * 登入禁用時間
@@ -67,8 +74,14 @@ public class UserPrincipal extends BaseEntity {
     public void setErrorTime(Date errorTime) {
         this.errorTime = errorTime;
     }
-    
-    
+
+    public Integer getGoogleErrorCount() {
+        return googleErrorCount;
+    }
+
+    public void setGoogleErrorCount(Integer googleErrorCount) {
+        this.googleErrorCount = googleErrorCount;
+    }
     
     
 }

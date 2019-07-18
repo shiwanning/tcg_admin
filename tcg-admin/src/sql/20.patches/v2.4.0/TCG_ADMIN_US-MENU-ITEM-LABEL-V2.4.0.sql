@@ -1,2 +1,0 @@
-Insert into TCG_ADMIN.US_MENU_ITEM_LABEL (LANG_CODE,LABEL,API_ID) values ('zh_CN','初始化功能設置',12004);
-Insert into TCG_ADMIN.US_MENU_ITEM_LABEL (LANG_CODE,LABEL,API_ID) values ('en_US','Initialize Functional Setting',12004);

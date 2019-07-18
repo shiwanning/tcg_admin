@@ -1,7 +1,6 @@
 package com.tcg.admin.controller.core.session;
 
 import java.net.URL;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,13 +13,9 @@ import javax.xml.bind.Unmarshaller;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CachePut;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.tcg.admin.model.xml.IgnoreURI;
 import com.tcg.admin.model.xml.RequestIntervalType;
 
@@ -31,9 +26,6 @@ public class TcgIgnoreListService {
     private Map<String, IgnoreURI> ignoreMap;
     
     private List<String> ignoreFuzzyKeys;
-
-    @Autowired
-    private TcgIgnoreListService self;
 
     @PostConstruct
     public void init() {
@@ -91,27 +83,4 @@ public class TcgIgnoreListService {
         
         return ignoreUri != null;
     }
-
-    /**
-     * Release RequestURI in token cache.
-     * 
-     * @param token
-     * @param reqURIKey
-     */
-    public void releaseRequestURI(String token, String reqURIKey) {
-        Map<String, Date> customerRequestMap = self.getCache(token);
-        customerRequestMap.remove(reqURIKey);
-        self.putCache(token, customerRequestMap);
-    }
-
-    @Cacheable(value = "RequestIntervalCache", key = "#token")
-    public Map<String, Date> getCache(String token) {
-        return Maps.newConcurrentMap();
-    }
-
-    @CachePut(value = "RequestIntervalCache", key = "#token")
-    public Map<String, Date> putCache(String token, Map<String, Date> cacheValue) {
-    	return cacheValue;
-    }
-
 }

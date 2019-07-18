@@ -12,6 +12,8 @@ public class QueryOperatorTO implements Serializable {
 
     private Integer activeFlag;
 
+    private Integer notIncludeActiveFlag;
+
     private int pagenumber = 0;
 
     private int pageSize = 0;
@@ -48,4 +50,11 @@ public class QueryOperatorTO implements Serializable {
         this.pageSize = pageSize;
     }
 
+    public Integer getNotIncludeActiveFlag() {
+        return notIncludeActiveFlag;
+    }
+
+    public void setNotIncludeActiveFlag(Integer notIncludeActiveFlag) {
+        this.notIncludeActiveFlag = notIncludeActiveFlag;
+    }
 }

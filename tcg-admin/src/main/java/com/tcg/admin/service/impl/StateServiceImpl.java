@@ -7,20 +7,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.tcg.admin.common.constants.IErrorCode;
+import com.tcg.admin.common.error.AdminErrorCode;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.model.State;
 import com.tcg.admin.model.StateRelationship;
-import com.tcg.admin.persistence.springdata.IOperatorRepository;
 import com.tcg.admin.persistence.springdata.IStateRepository;
 import com.tcg.admin.service.StateService;
 
 @Service
 @Transactional
 public class StateServiceImpl implements StateService {
-
-    @Autowired
-    private IOperatorRepository operatorRepository;
 
     @Autowired
     private IStateRepository stateRepository;
@@ -47,10 +43,10 @@ public class StateServiceImpl implements StateService {
     }
 
 	@Override
-	public State getState(Integer stateId) throws AdminServiceBaseException {
+	public State getState(Integer stateId) {
 		State state = stateRepository.findOne(stateId);
 		if (state == null) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, "State Not Found");
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, "State Not Found");
 		}
 		return state;
 	}

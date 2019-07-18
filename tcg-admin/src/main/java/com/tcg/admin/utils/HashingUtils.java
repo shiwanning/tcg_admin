@@ -11,7 +11,7 @@ public class HashingUtils {
     public static final String SHA_1 = "SHA-1";
 
     private HashingUtils() {
-
+    	throw new IllegalStateException("Utility class");
     }
 
     public static String encryptByMD5(String inputText) {

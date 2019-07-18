@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 public class JsonResponse {
 
 	public static final JsonResponse OK = new JsonResponse(true);
+	public static final JsonResponse FAIL = new JsonResponse(false);
 	
     private boolean success;
     private String errorCode;

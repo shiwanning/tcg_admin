@@ -1,6 +1,7 @@
 package com.tcg.admin.to;
 
 import java.io.Serializable;
+import java.util.Date;
 
 public class QueryOperatorsTO implements Serializable {
 
@@ -34,6 +35,12 @@ public class QueryOperatorsTO implements Serializable {
     private Roles roles;
 
     private String baseMerchantCode;
+
+    private Date lastLoginTime;
+
+    private String lastLoginIP;
+
+    private Integer googleAuthStatus;
 
     public Integer getOperatorId() {
         return operatorId;
@@ -129,5 +136,29 @@ public class QueryOperatorsTO implements Serializable {
 
     public void setBaseMerchantCode(String baseMerchantCode) {
         this.baseMerchantCode = baseMerchantCode;
+    }
+
+    public Date getLastLoginTime() {
+        return lastLoginTime;
+    }
+
+    public void setLastLoginTime(Date lastLoginTime) {
+        this.lastLoginTime = lastLoginTime;
+    }
+
+    public String getLastLoginIP() {
+        return lastLoginIP;
+    }
+
+    public void setLastLoginIP(String lastLoginIP) {
+        this.lastLoginIP = lastLoginIP;
+    }
+
+    public Integer getGoogleAuthStatus() {
+        return googleAuthStatus;
+    }
+
+    public void setGoogleAuthStatus(Integer googleAuthStatus) {
+        this.googleAuthStatus = googleAuthStatus;
     }
 }

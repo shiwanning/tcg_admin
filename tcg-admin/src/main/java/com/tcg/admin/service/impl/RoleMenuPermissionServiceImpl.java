@@ -2,15 +2,10 @@ package com.tcg.admin.service.impl;
 
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 
-import javax.validation.ConstraintViolation;
-
+import com.google.common.collect.Sets;
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.beanutils.BeanUtilsBean;
 import org.apache.commons.collections.CollectionUtils;
@@ -18,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -30,8 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.tcg.admin.common.constants.IErrorCode;
+import com.tcg.admin.cache.MerchantCacheable;
+import com.tcg.admin.cache.RedisCacheEvict;
+import com.tcg.admin.cache.RedisCacheable;
 import com.tcg.admin.common.constants.LoginConstant;
+import com.tcg.admin.common.constants.RoleIdConstant;
 import com.tcg.admin.common.error.AdminErrorCode;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.common.helper.RequestHelper;
@@ -61,7 +58,6 @@ import com.tcg.admin.persistence.springdata.IRoleOperatorRepository;
 import com.tcg.admin.persistence.springdata.IRoleRepository;
 import com.tcg.admin.service.CommonMenuService;
 import com.tcg.admin.service.MerchantService;
-import com.tcg.admin.service.OperatorAuthenticationService;
 import com.tcg.admin.service.RoleMenuPermissionService;
 import com.tcg.admin.service.specifications.RoleSpecifications;
 import com.tcg.admin.to.QueryRoleTO;
@@ -70,8 +66,6 @@ import com.tcg.admin.to.UserInfo;
 import com.tcg.admin.to.response.OperatorInfoTo;
 import com.tcg.admin.utils.NullAwareBeanUtilsBean;
 import com.tcg.admin.utils.StringTools;
-import com.tcg.admin.utils.ValidatorUtils;
-import com.tcg.admin.utils.shiro.ShiroUtils;
 
 import ch.lambdaj.Lambda;
 
@@ -80,7 +74,6 @@ import ch.lambdaj.Lambda;
 public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(RoleMenuPermissionServiceImpl.class);
-	private static final Integer SUPER_MANAGER_ROLE_ID = 1;
 
 	@Autowired
 	private CommonMenuService menuCacher;// 選單的Cache服務
@@ -113,9 +106,6 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 	private IMenuCategoryMenuRepository menuCategoryMenuRepository;
 
 	@Autowired
-	private OperatorAuthenticationService operatorAuthenticationService;
-
-	@Autowired
 	private RoleMenuPermissionService roleMenuPermissionService;
 
 	@Autowired
@@ -136,120 +126,59 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 	@Autowired
 	IMenuCategoryRepository menuCategoryRepository;
 
+
 	@Override
+	@RedisCacheEvict(allEntries = true)
 	public void correlatePermission(Integer roleId, List<Integer> menuIdList) {
-		try {
-
-			// 1.確認role是否存在____________________________________________________________________
-			Role role = roleRepository.findOne(roleId);
-			if (role == null) {
-				throw new AdminServiceBaseException(AdminErrorCode.ROLE_NOT_EXIST_ERROR,
-						"can't find the corresponding role");
-			}
-
-			List<MenuItem> menuItems = this.queryMenuItemsByRole(roleId);
-
-			// REMOVE NULL
-
-			List<Integer> currentRolePermissions = Lambda.extract(menuItems, Lambda.on(MenuItem.class).getMenuId());
-
-			// 2.每個menuId都要存在__________________________________________________________________
-			for (Integer menuId : menuIdList) {
-				MenuItem menu = menuCacher.getMenuMap().get(menuId);
-				if (menu == null) {
-					throw new AdminServiceBaseException(AdminErrorCode.MENU_NOT_EXIST_ERROR,
-							"can't find the corresponding menu");
-				}
-			}
-
-			if (CollectionUtils.isNotEmpty(currentRolePermissions)) {
-				this.unCorrelatePermission(roleId, currentRolePermissions);
-			}
-
-			// 3.關聯關係___________________________________________________________________________
-			List<RoleMenuPermission> roleMenuList = Lists.newLinkedList();
-
-			for (Integer menuId : menuIdList) {
-				RoleMenuPermission roleMenu = new RoleMenuPermission();
-				roleMenu.setRoleId(roleId);
-				roleMenu.setMenuId(menuId);
-				roleMenuList.add(roleMenu);
-			}
-
-			roleMenuRepository.save(roleMenuList);
-
-		} catch (AdminServiceBaseException ex) {
-			throw ex;
-		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+		// 1.確認role是否存在____________________________________________________________________
+		Role role = roleRepository.findOne(roleId);
+		if (role == null) {
+			throw new AdminServiceBaseException(AdminErrorCode.ROLE_NOT_EXIST_ERROR,
+					"can't find the corresponding role");
 		}
+
+		List<MenuItem> menuItems = this.queryMenuItemsByRole(roleId);
+
+		// REMOVE NULL
+
+		List<Integer> currentRolePermissions = Lambda.extract(menuItems, Lambda.on(MenuItem.class).getMenuId());
+
+		// 2.每個menuId都要存在__________________________________________________________________
+		for (Integer menuId : menuIdList) {
+			MenuItem menu = menuCacher.getMenuMap().get(menuId);
+			if (menu == null) {
+				throw new AdminServiceBaseException(AdminErrorCode.MENU_NOT_EXIST_ERROR,
+						"can't find the corresponding menu");
+			}
+		}
+
+		if (CollectionUtils.isNotEmpty(currentRolePermissions)) {
+			this.unCorrelatePermission(roleId, currentRolePermissions);
+		}
+
+		// 3.關聯關係___________________________________________________________________________
+		List<RoleMenuPermission> roleMenuList = Lists.newLinkedList();
+
+		for (Integer menuId : menuIdList) {
+			RoleMenuPermission roleMenu = new RoleMenuPermission();
+			roleMenu.setRoleId(roleId);
+			roleMenu.setMenuId(menuId);
+			roleMenuList.add(roleMenu);
+		}
+
+		roleMenuRepository.save(roleMenuList);
 	}
 
 	@Override
 	public void unCorrelatePermission(Integer roleId, List<Integer> menuIdList) {
-
-		try {
-			roleMenuRepository.deleteRoleIdAndMenuIdList(roleId, menuIdList);
-		} catch (AdminServiceBaseException ex) {
-			throw ex;
-		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
-		}
-
+        roleMenuRepository.deleteRoleIdAndMenuIdListByRoleId(roleId);
+        deleteRoleIdAndMenuIdList(roleId, menuIdList);
 	}
-
-	@Override
-	public void createMenuItem(MenuItem menu) {
-		try {
-			// 已存在則不能新增
-			if (menuCacher.getMenuMap().get(menu.getMenuId()) != null) {
-				throw new AdminServiceBaseException(AdminErrorCode.MENU_ALREADY_EXIST, "This menu has already exsited");
-			}
-
-			// menu 名稱不能重複
-			for (MenuItem menuListItem : menuCacher.getMenuList()) {
-				if (menu.getMenuName().equals(menuListItem.getMenuName())) {
-					throw new AdminServiceBaseException(AdminErrorCode.MENU_ALREADY_EXIST,
-							"This menu name has already used");
-				}
-			}
-
-			checkParentAndSetTreeLevel(menu);
-
-			// 執行新增
-			menuCacher.addMenu(menu);
-
-		} catch (AdminServiceBaseException ex) {
-			throw ex;
-		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+	
+	private void deleteRoleIdAndMenuIdList(Integer roleId, List<Integer> menuIdList) {
+		for(List<Integer> partition : Lists.partition(menuIdList, 850)) {
+			roleMenuRepository.deleteRoleIdAndMenuIdList(roleId, partition);
 		}
-	}
-
-	@Override
-	public void deleteMenuItem(Integer menuItemId) {
-		try {
-
-			// 有role已分配此選單的權限則不可刪除
-			if (!roleMenuRepository.findByMenuId(menuItemId).isEmpty()) {
-				throw new AdminServiceBaseException(AdminErrorCode.MENU_BELONG_TO_ROLE_ERROR,
-						"can't remove menu which is belong to Roles");
-			}
-
-			// 選單不存在則不能刪除
-			MenuItem menu = menuCacher.getMenuMap().get(menuItemId);
-			if (menu == null) {
-				throw new AdminServiceBaseException(AdminErrorCode.MENU_NOT_EXIST_ERROR, "can't remove unexist menu");
-			}
-
-			menuCacher.removeMenu(menu);
-
-		} catch (AdminServiceBaseException ex) {
-			throw ex;
-		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
-		}
-
 	}
 
 	@Override
@@ -277,10 +206,8 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 			beanUtilsBean.copyProperties(dbMenuItem, menuItem);
 
 			menuCacher.updateMenu(dbMenuItem);
-		} catch (AdminServiceBaseException ex) {
-			throw ex;
-		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+		} catch (IllegalAccessException | InvocationTargetException ex) {
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
 		}
 	}
 
@@ -289,50 +216,43 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 		try {
 			return menuCacher.getWholeMenuTree();
 		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
 		}
 	}
 
 	@Override
-	@Cacheable(value= "cache-ap-admin", key = "'queryAllMenuTreeByOperator:' + #operatorId")
-	public Map<Integer, List<MenuItem>> queryAllMenuTreeByOperator(Integer operatorId) {
-		try {
-
-			// 1.確認此管理員存在(無存在拋ex)__________________________________________________________
-			Operator op = operatorRepository.findOne(operatorId);
-			if (op == null || op.getActiveFlag().equals(LoginConstant.ACTIVE_FLAG_DELETE.getStatusCode())) {
-				throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_NOT_EXIST_ERROR,
-						"This operator is not exist");
-			}
-
-			// 2.取得此管理員的隸屬角色(無角色拋ex)_____________________________________________________
-			List<Integer> roleIdList = roleOperatorCustomRepository.findRoleIdListByOperatorId(operatorId);
-			if (roleIdList.isEmpty()) {
-				throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_WITHOUT_ROLE_ERROR,
-						"This operator is not in any Role");
-			}
-
-			// 3.取得這些角色具有那些選單權限(無任何menu權限拋ex)________________________________________
-			Set<Integer> menuIdList = roleMenuRepository.findMenuIdListByRoleIdList(roleIdList);
-			if (menuIdList.isEmpty()) {
-				throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_WITHOUT_MENU_PRIVILEGE_ERROR,
-						"This operator dosen't have menu privilege");
-			}
-			menuIdList.add(0);// 加入最頂層目錄
-
-			// 4.組該operator專屬選單_________________________________________________________________
-			return generateOperatorMenuTree(roleIdList.contains(SUPER_MANAGER_ROLE_ID), menuIdList);
-		} catch (AdminServiceBaseException ex) {
-			throw ex;
-		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
+	@RedisCacheable(key = "'queryAllMenuTreeByOperator:' + #operatorId")
+	public Map<String, List<MenuItem>> queryAllMenuTreeByOperator(Integer operatorId) {
+		// 1.確認此管理員存在(無存在拋ex)__________________________________________________________
+		Operator op = operatorRepository.findOne(operatorId);
+		if (op == null || op.getActiveFlag().equals(LoginConstant.ACTIVE_FLAG_DELETE.getStatusCode())) {
+			throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_NOT_EXIST_ERROR,
+					"This operator is not exist");
 		}
+
+		// 2.取得此管理員的隸屬角色(無角色拋ex)_____________________________________________________
+		List<Integer> roleIdList = roleOperatorCustomRepository.findRoleIdListByOperatorId(operatorId);
+		if (roleIdList.isEmpty()) {
+			throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_WITHOUT_ROLE_ERROR,
+					"This operator is not in any Role");
+		}
+
+		// 3.取得這些角色具有那些選單權限(無任何menu權限拋ex)________________________________________
+		Set<Integer> menuIdList = roleMenuRepository.findMenuIdListByRoleIdList(roleIdList);
+		if (menuIdList.isEmpty()) {
+			throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_WITHOUT_MENU_PRIVILEGE_ERROR,
+					"This operator dosen't have menu privilege");
+		}
+		menuIdList.add(0);// 加入最頂層目錄
+
+		// 4.組該operator專屬選單_________________________________________________________________
+		return generateOperatorMenuTree(roleIdList.contains(RoleIdConstant.SUPER_MANAGER_ROLE_ID), menuIdList);
 	}
 
-	private Map<Integer, List<MenuItem>> generateOperatorMenuTree(boolean isAdmin, Set<Integer> menuIdList) {
+	private Map<String, List<MenuItem>> generateOperatorMenuTree(boolean isAdmin, Set<Integer> menuIdList) {
 		Map<Integer, List<MenuItem>> allMenuTree = this.queryAllMenuTree();
 
-		Map<Integer, List<MenuItem>> operatorMenuTree = Maps.newHashMap();
+		Map<String, List<MenuItem>> operatorMenuTree = Maps.newHashMap();
 		for (Entry<Integer, List<MenuItem>> entry : allMenuTree.entrySet()) {
 
 			Integer menuId = entry.getKey();
@@ -343,18 +263,24 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 			if (isAdmin) {
 				eachMenuList = Lists.newLinkedList(menus);
 			} else if (menuIdList.contains(menuId)) {
-				eachMenuList = Lists.newLinkedList();
-				for (MenuItem subMenu : menus) {
-					if (menuIdList.contains(subMenu.getMenuId())) {
-						eachMenuList.add(subMenu);
-					}
-				}
+				// 取交集
+				eachMenuList = intersectionMenu(menuIdList, menus);
 			}
 			if (eachMenuList != null && !eachMenuList.isEmpty()) {
-				operatorMenuTree.put(menuId, eachMenuList);
+				operatorMenuTree.put(menuId.toString(), eachMenuList);
 			}
 		}
 		return operatorMenuTree;
+	}
+
+	private List<MenuItem> intersectionMenu(Set<Integer> menuIdList, List<MenuItem> menus) {
+		List<MenuItem> eachMenuList = Lists.newLinkedList();
+		for (MenuItem subMenu : menus) {
+			if (menuIdList.contains(subMenu.getMenuId())) {
+				eachMenuList.add(subMenu);
+			}
+		}
+		return eachMenuList;
 	}
 
 	@Override
@@ -362,8 +288,13 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 		Set<Integer> menuIdList = menuCategoryMenuRepository.findMenuIdByMenuCategoryName(menuCategoryNameList);
 		menuIdList.add(0);// 加入最頂層目錄
 
+		List<Integer> topTreeNode = menuRepository.findTopTreeNode();
+
+		if("SYSTEM".equalsIgnoreCase(menuCategoryNameList.get(0))){
+           menuIdList.addAll(topTreeNode);
+		}
 		Map<Integer, List<MenuItem>> allMenuTree = this.queryAllMenuTree();
-		Map<Integer, List<MenuItem>> result = Maps.newHashMap();
+		Map<String, List<MenuItem>> result = Maps.newHashMap();
 		for (Entry<Integer, List<MenuItem>> menuEntry : allMenuTree.entrySet()) {
 			Integer menuId = menuEntry.getKey();
 			List<MenuItem> menus = menuEntry.getValue();
@@ -374,14 +305,14 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 		List<MenuItem> firstParentTree = Lists.newLinkedList();
 
 		if (!result.isEmpty()) {
-			firstParentTree = result.get(0);
+			firstParentTree = getFirstParamTree(result);
 		}
 
 		return grenateTreeTo(firstParentTree, result);
 
 	}
 
-	private void putEachMenuList(Map<Integer, List<MenuItem>> result, Set<Integer> menuIdList, Integer menuId, List<MenuItem> menus) {
+	private void putEachMenuList(Map<String, List<MenuItem>> result, Set<Integer> menuIdList, Integer menuId, List<MenuItem> menus) {
 		if (menuIdList.contains(menuId)) {
 			List<MenuItem> eachMenuList = Lists.newLinkedList();
 			for (MenuItem subMenu : menus) {
@@ -391,12 +322,12 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 			}
 			// 此層目錄向下有直屬節點才加入map中......................
 			if (!eachMenuList.isEmpty()) {
-				result.put(menuId, eachMenuList);
+				result.put(String.valueOf(menuId), eachMenuList);
 			}
 		}
 	}
 
-	private List<TreeTo> grenateTreeTo(List<MenuItem> firstParentTree, Map<Integer, List<MenuItem>> result) {
+	private List<TreeTo> grenateTreeTo(List<MenuItem> firstParentTree, Map<String, List<MenuItem>> result) {
 		List<TreeTo> finList = Lists.newLinkedList();
 		for (MenuItem firstMenuItem : firstParentTree) {
 			TreeTo cloneTree = new TreeTo();
@@ -404,7 +335,7 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 			Integer menuId = firstMenuItem.getMenuId();
 
 			// 代表有子節點
-			List<MenuItem> childList = result.get(menuId);
+			List<MenuItem> childList = result.get(String.valueOf(menuId));
 			if (childList != null && !childList.isEmpty()) {
 				cloneTree.setList(this.returnChildList(result, childList));
 			}
@@ -413,14 +344,17 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 		return finList;
 	}
 
-	private List<TreeTo> returnChildList(Map<Integer, List<MenuItem>> result, List<MenuItem> childList) {
+	private List<TreeTo> returnChildList(Map<? extends Object, List<MenuItem>> result, List<MenuItem> childList) {
 		List<TreeTo> menuItemLists = Lists.newLinkedList();
 		for (int i = 0; i < childList.size(); i++) {
 			MenuItem menuItem = childList.get(i);
 			Integer menuId = menuItem.getMenuId();
 
 			// 代表有子節點
-			List<MenuItem> subList = result.get(menuId);
+			List<MenuItem> subList = result.get(String.valueOf(menuId));
+			if(subList == null) {
+				subList = result.get(menuId);
+			}
 			TreeTo cloneTree = new TreeTo();
 			copyProperties(cloneTree, menuItem);
 			if (subList != null && !subList.isEmpty()) {
@@ -442,29 +376,33 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 	
 	@Override
 	public MenuItem queryMenuItemById(Integer menuId) {
-		return menuCacher.getMenuMap().get(menuId);
+		return menuId == null ? null : menuCacher.getMenuMap().get(menuId);
 	}
 
 	@Override
 	public List<MenuItem> queryMenuItemsByRole(Integer roleId) {
-		try {
-			List<Integer> roleIdList = Lists.newLinkedList();
-			roleIdList.add(roleId);
+		List<Integer> roleIdList = Lists.newLinkedList();
+		roleIdList.add(roleId);
 
-			Set<Integer> menuIdList = roleMenuRepository.findMenuIdListByRoleIdList(roleIdList);
+		Set<Integer> menuIdList = findMenuIdListByRoleIdList(roleIdList);
 
-			List<MenuItem> menuItemList = Lists.newLinkedList();
-			for (Integer menuId : menuIdList) {
-				MenuItem menu = menuCacher.getMenuMap().get(menuId);
-				if (menu != null) {
-					menuItemList.add(menuCacher.getMenuMap().get(menuId));
-				}
+		List<MenuItem> menuItemList = Lists.newLinkedList();
+		for (Integer menuId : menuIdList) {
+			MenuItem menu = menuCacher.getMenuMap().get(menuId);
+			if (menu != null) {
+				menuItemList.add(menuCacher.getMenuMap().get(menuId));
 			}
-
-			return menuItemList;
-		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
 		}
+
+		return menuItemList;
+	}
+
+	private Set<Integer> findMenuIdListByRoleIdList(List<Integer> roleIdList) {
+		Set<Integer> menuIdList = Sets.newHashSet();
+		for(List<Integer> partition : Lists.partition(roleIdList, 999)) {
+			menuIdList.addAll(roleMenuRepository.findMenuIdListByRoleIdList(partition));
+		}
+		return menuIdList;
 	}
 
 	@Override
@@ -474,6 +412,7 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 	}
 
 	@Override
+	@RedisCacheable(key = "'verifyMenuItemPermission:' + #menuItem.menuId + ':' + #operatorId")
 	public boolean verifyMenuItemPermission(Integer operatorId, MenuItem menuItem) {
 		// 檢查operatorId和menuItem
 		Operator op = operatorRepository.findOne(operatorId);
@@ -493,7 +432,7 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 			return false;
 		}
 
-		if(roleIdList.contains(SUPER_MANAGER_ROLE_ID)) {
+		if(roleIdList.contains(RoleIdConstant.SUPER_MANAGER_ROLE_ID)) {
 			if (existedMenuItem.getTreeLevel() == 2) {
 				LOGGER.info("super loggin menu access");
 			}
@@ -527,82 +466,47 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 	@Override
 	public Page<Role> getRolesByMenuId(Integer menuId, Integer activeFlag, int pageNumber, int pageSize,
 			String sortOrder, String sortColumn) {
-		Page<Role> page = null;
-		try {
-			List<Integer> roleIdList = this.queryRolesByMenuId(menuId);
 
-			// 查詢 US_ROLE 設定條件所需的物件
-			QueryRoleTO queryRoleTO = new QueryRoleTO();
+		List<Integer> roleIdList = this.queryRolesByMenuId(menuId);
 
-			queryRoleTO.setRoleIdList(roleIdList);
+		// 查詢 US_ROLE 設定條件所需的物件
+		QueryRoleTO queryRoleTO = new QueryRoleTO();
 
-			queryRoleTO.setActiveFlag(1); // 只找啟用的Role
+		queryRoleTO.setRoleIdList(roleIdList);
 
-			// 頁數
-			queryRoleTO.setPagenumber(pageNumber);
-			// 每頁筆數
-			queryRoleTO.setPageSize(pageSize);
+		queryRoleTO.setActiveFlag(1); // 只找啟用的Role
 
-			// 組成where condition 查詢條件
-			Specification<Role> role = RoleSpecifications.queryByConditions(queryRoleTO);
+		// 頁數
+		queryRoleTO.setPagenumber(pageNumber);
+		// 每頁筆數
+		queryRoleTO.setPageSize(pageSize);
 
-			Pageable request = new PageRequest(pageNumber - 1, pageSize,
-					"asc".equalsIgnoreCase(sortOrder) ? Sort.Direction.ASC : Sort.Direction.DESC,
-					sortColumn != null ? sortColumn : "roleId");
-			// 由 roleRepository 做查詢
-			page = roleRepository.findAll(role, request);
+		// 組成where condition 查詢條件
+		Specification<Role> role = RoleSpecifications.queryByConditions(queryRoleTO);
 
-		} catch (Exception e) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
-		}
-		return page;
+		Pageable request = new PageRequest(pageNumber - 1, pageSize,
+				"asc".equalsIgnoreCase(sortOrder) ? Sort.Direction.ASC : Sort.Direction.DESC,
+				sortColumn != null ? sortColumn : "roleId");
+		// 由 roleRepository 做查詢
+
+		return roleRepository.findAll(role, request);
 	}
 
 	@Override
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public JsTreeMenu getOperatorJsMenuTree(Operator operator) {
+		Map<String, List<MenuItem>> menuTree = this.queryAllMenuTreeByOperator(operator.getOperatorId());
 
-		try {
-			if (operator == null) {
-				throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_NOT_EXIST_ERROR, "operator not exist");
-			}
+		JsTreeMenu treeMenu = new JsTreeMenu();
+		List<JsMenuNode> operatorMenuTree = Lists.newLinkedList();
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
+		List<Integer> menuItemsOfBaseMerchant = this.menuIdsByBaseMerchant(userInfo.getUser());
+		boolean isAdmin = this.isAdmin(userInfo.getUser().getOperatorId());
+		List<JsMenuNode> categoryList = setSubJsMenuList(userInfo, "0", menuTree, menuItemsOfBaseMerchant, isAdmin);
+		operatorMenuTree.addAll(categoryList);
+		treeMenu.setTreeMenu(operatorMenuTree);
 
-			Map<Integer, List<MenuItem>> menuTree = this.queryAllMenuTreeByOperator(operator.getOperatorId());
-
-			JsTreeMenu treeMenu = new JsTreeMenu();
-			List<JsMenuNode> operatorMenuTree = Lists.newLinkedList();
-			UserInfo<Operator> userInfo = operatorAuthenticationService.getOperatorByToken(RequestHelper.getToken());
-			List<Integer> menuItemsOfBaseMerchant = this.menuIdsByBaseMerchant(userInfo.getUser());
-			boolean isAdmin = this.isAdmin(userInfo.getUser().getOperatorId());
-			List<JsMenuNode> categoryList = setSubJsMenuList(userInfo, 0, menuTree, menuItemsOfBaseMerchant, isAdmin);
-			operatorMenuTree.addAll(categoryList);
-			treeMenu.setTreeMenu(operatorMenuTree);
-
-			return treeMenu;
-
-		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, "fail to get menu tree", ex);
-		}
-	}
-
-	@Override
-	public void submitEditPermissionForm(MenuItem menuItem) {
-		/**
-		 * Check for the violations of @NotNull annotation in entity
-		 */
-
-		menuItem.setUpdateTime(new Date());
-		Set<ConstraintViolation<MenuItem>> violations = ValidatorUtils.validate(menuItem);
-
-		if (CollectionUtils.isNotEmpty(violations)) {
-			throw new AdminServiceBaseException(AdminErrorCode.PARAMETER_IS_REQUIRED, "request param error");
-		}
-
-		/**
-		 * Proceed update MenuItem
-		 */
-		this.updateMenuItem(menuItem);
-
+		return treeMenu;
 	}
 
 	@Override
@@ -623,66 +527,118 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 		menuCacher.refresh();
 	}
 
+
 	@Override
-	public List<MenuItem> getAllButtonList(String operatorName) {
-		try {
+	public List<MenuItem> getAllButtonListForService(String operatorName) {
+		// 先確認operator存在
+		Operator operator = operatorRepository.findByOperatorName(operatorName);
+		if (operator == null) {
+			throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_NOT_EXIST_ERROR, "operator not exist");
+		}
 
-			// 先確認operator存在
-			Operator operator = operatorRepository.findByOperatorName(operatorName);
-			if (operator == null) {
-				throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_NOT_EXIST_ERROR, "operator not exist");
+		// 由cache取得選單並且過濾僅保留按鈕權限
+		Map<String, List<MenuItem>> menuTree = this.queryAllMenuTreeByOperator(operator.getOperatorId());
+
+		List<MenuItem> buttonList = Lists.newLinkedList();
+		for (Entry<String, List<MenuItem>> entry : menuTree.entrySet()) {
+			List<MenuItem> menuList = entry.getValue();
+			for (MenuItem eachMenu : menuList) {
+				buttonList.add(eachMenu);
 			}
+		}
 
-			// 由cache取得選單並且過濾僅保留按鈕權限
-			Map<Integer, List<MenuItem>> menuTree = this.queryAllMenuTreeByOperator(operator.getOperatorId());
+		return buttonList;
+	}
+	@Override
+	public List<Integer> getAllButtonList(String operatorName) {
+		// 先確認operator存在
 
-			List<MenuItem> buttonList = Lists.newLinkedList();
-			for (Entry<Integer, List<MenuItem>> entry : menuTree.entrySet()) {
-				List<MenuItem> menuList = entry.getValue();
-				for (MenuItem eachMenu : menuList) {
-					buttonList.add(eachMenu);
+		Operator operator = operatorRepository.findByOperatorName(operatorName);
+		if (operator == null) {
+			throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_NOT_EXIST_ERROR, "operator not exist");
+		}
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
+
+		// 由cache取得選單並且過濾僅保留按鈕權限
+		Map<String, List<MenuItem>> menuTree = this.queryAllMenuTreeByOperator(operator.getOperatorId());
+
+		List<Integer> menuItemsOfBaseMerchant = this.menuIdsByBaseMerchant(userInfo.getUser());
+
+
+		boolean isAdmin = this.isAdmin(userInfo.getUser().getOperatorId());
+
+		List<TreeTo> finList = Lists.newLinkedList();
+		// 取得第一階的父Tree
+		List<MenuItem> firstParentTree = getFirstParamTree(menuTree);
+		try {
+			for (MenuItem firstMenuItem : firstParentTree) {
+				TreeTo cloneTree = new TreeTo();
+				BeanUtils.copyProperties(cloneTree, firstMenuItem);
+				finList.add(cloneTree);
+
+				// 代表有子節點
+				List<MenuItem> childList = menuTree.get(String.valueOf(firstMenuItem.getMenuId()));
+				if (!CollectionUtils.isEmpty(childList)) {
+					cloneTree.setList(
+							this.returnChildListWithBaseMerchant2(menuTree, childList, menuItemsOfBaseMerchant, isAdmin));
 				}
 			}
+		} catch (InvocationTargetException | IllegalAccessException e) {
+			LOGGER.error("findPermissionOfOperator fail", e);
+		}
+		List<Integer> permissons = new ArrayList<Integer>();
 
-			return buttonList;
-		} catch (AdminServiceBaseException ex) {
-			throw ex;
-		} catch (Exception ex) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, ex);
+		for(TreeTo treeTo : finList){
+			//添加最外层树Id
+			permissons.add(treeTo.getMenuId());
+			//遍历每一层下list
+			this.getPermissions(permissons, treeTo.getList());
+		}
+		return permissons;
+	}
+
+	private void getPermissions(List<Integer> permissons, List<TreeTo> childList){
+		if(!CollectionUtils.isEmpty(childList)){
+			for(TreeTo treeChild : childList){
+				permissons.add(treeChild.getMenuId());
+				this.getPermissions(permissons, treeChild.getList());
+			}
 		}
 	}
 
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	@Override
-	public List<Map<String, String>> getMerchants(UserInfo<Operator> op) {
-		Integer operatorId = op.getUser().getOperatorId();
+	@MerchantCacheable(key="'getMerchants:' + #userInfo.user.operatorId")
+	public List<Map<String, String>> getMerchants(UserInfo<Operator> userInfo) {
+		return getMerchants(userInfo.getUser().getOperatorId());
+	}
+	
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
+	@Override
+	@MerchantCacheable(key="'getMerchants:' + #operatorId")
+	public List<Map<String, String>> getMerchants(Integer operatorId) {
 		List<Integer> roleIds = roleOperatorRepository.findRoleIdListByOperatorId(operatorId);
 		List<Merchant> tempList = Lists.newLinkedList();
 		// set values in session, only request one time per session
-		String merchantList = "merchantList";
-		List<Merchant> merchants = ShiroUtils.getSessionValue(op.getToken(), merchantList);
+		List<Merchant> merchants = merchantServiceBean.checkAdmMerchantList();
 
-		if (merchants == null || merchants.isEmpty()) {
-			merchants = merchantServiceBean.checkAdmMerchantList();
-			ShiroUtils.setSessionValue(op.getToken(), merchantList, merchants);
-		}
 		// if role is super admin, is will return all merchant list, else query
 		// merchantList in the mapping table by operatorId
-		if (roleIds.contains(SUPER_MANAGER_ROLE_ID)) {
+		if (roleIds.contains(RoleIdConstant.SUPER_MANAGER_ROLE_ID)) {
 			tempList = merchants;
 		} else {
 			List<Integer> merchantIds = merchantOperatorRepository.findMerchantIdListByOperatorId(operatorId);
+			
 			for (Merchant merchant : merchants) {
-				for (Integer merchantId : merchantIds) {
-					if (merchant.getMerchantId().equals(merchantId)) {
-						tempList.add(merchant);
-					}
+				if(merchantIds.contains(merchant.getMerchantId())) {
+					tempList.add(merchant);
 				}
 			}
 		}
 
 		return generateMerchantCodeList(tempList);
 	}
+
 
 	private List<Map<String, String>> generateMerchantCodeList(List<Merchant> tempList) {
 		List<Map<String, String>> merchantCodeList = Lists.newLinkedList();
@@ -707,25 +663,18 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 		List<Integer> roleIds = roleOperatorRepository.findRoleIdListByOperatorId(operatorId);
 
 		// set values in session, only request one time per session
-		String merchantList = "merchantList";
-		List<Merchant> merchants = ShiroUtils.getSessionValue(op.getToken(), merchantList);
+		List<Merchant> merchants = merchantServiceBean.checkAdmMerchantList();
 
-		if (merchants == null || merchants.isEmpty()) {
-			merchants = merchantServiceBean.checkAdmMerchantList();
-			ShiroUtils.setSessionValue(op.getToken(), merchantList, merchants);
-		}
 		// if role is super admin, is will return all merchant list, else query
 		// merchantList in the mapping table by operatorId
 		List<Merchant> tempList = Lists.newLinkedList();
-		if (roleIds.contains(SUPER_MANAGER_ROLE_ID)) {
+		if (roleIds.contains(RoleIdConstant.SUPER_MANAGER_ROLE_ID)) {
 			tempList = merchants;
 		} else {
 			List<Integer> merchantIds = merchantOperatorRepository.findMerchantIdListByOperatorId(operatorId);
 			for (Merchant merchant : merchants) {
-				for (Integer merchantId : merchantIds) {
-					if (merchant.getMerchantId().equals(merchantId)) {
-						tempList.add(merchant);
-					}
+				if(merchantIds.contains(merchant.getMerchantId())) {
+					tempList.add(merchant);
 				}
 			}
 		}
@@ -757,8 +706,8 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 	 *
 	 * @return
 	 */
-	private List<JsMenuNode> setSubJsMenuList(UserInfo<Operator> userInfo, Integer menuId,
-			Map<Integer, List<MenuItem>> menuTree, List<Integer> menuItemsOfBaseMerchant, boolean isAdmin) {
+	private List<JsMenuNode> setSubJsMenuList(UserInfo<Operator> userInfo, String menuId,
+			Map<String, List<MenuItem>> menuTree, List<Integer> menuItemsOfBaseMerchant, boolean isAdmin) {
 		if (menuTree.get(menuId) == null || menuTree.get(menuId).isEmpty()) {
 			return Lists.newLinkedList();
 		}
@@ -772,22 +721,27 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 			// 如果還有下層, 把下層選單清單組出來 //zero will always fall here
 			if (subMenu.getIsLeaf().equals(0)) {
 				subNode.setChildren(
-						setSubJsMenuList(userInfo, subMenu.getMenuId(), menuTree, menuItemsOfBaseMerchant, isAdmin));
+						setSubJsMenuList(userInfo, String.valueOf(subMenu.getMenuId()), menuTree, menuItemsOfBaseMerchant, isAdmin));
 			}
 			/*
 			 * Will add only if root has a children || the submenu of root that has
 			 * permission and in the base merchant menu id's
 			 */
-			if ((subMenu.getParentId() == 0 && CollectionUtils.isNotEmpty(subNode.getChildren()))
-					|| (subMenu.getParentId() != 0 && (menuItemsOfBaseMerchant.contains(subMenu.getMenuId())
-					|| CollectionUtils.isEmpty(menuItemsOfBaseMerchant)))
-					|| isAdmin) {
+			if (isAdmin || isRootMenu(subMenu, subNode) || isMerchantMenu(subMenu, menuItemsOfBaseMerchant)) {
 				subJsMenuList.add(subNode);
 			}
-		
 		}
 
 		return subJsMenuList;
+	}
+
+	private boolean isMerchantMenu(MenuItem subMenu, List<Integer> menuItemsOfBaseMerchant) {
+		return subMenu.getParentId() != 0 && (menuItemsOfBaseMerchant.contains(subMenu.getMenuId())
+				|| CollectionUtils.isEmpty(menuItemsOfBaseMerchant));
+	}
+
+	private boolean isRootMenu(MenuItem subMenu, JsMenuNode subNode) {
+		return subMenu.getParentId() == 0 && CollectionUtils.isNotEmpty(subNode.getChildren());
 	}
 
 	private boolean isMenuType(MenuItem subMenu) {
@@ -829,14 +783,14 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 
 	@Override
 	public List<TreeTo> findPermissionOfOperator() {
-		UserInfo<Operator> userInfo = operatorAuthenticationService.getOperatorByToken(RequestHelper.getToken());
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		return findPermissionOfOperator(userInfo.getUser().getOperatorId(), userInfo);
 	}
 
 	@Override
-	@Cacheable(value = "cache-ap-admin", key = "'findPermissionOfOperator:' + #opreatorId")
+	//@RedisCacheable(key = "'findPermissionOfOperator:' + #opreatorId")
 	public List<TreeTo> findPermissionOfOperator(Integer opreatorId, UserInfo<Operator> userInfo) {
-		Map<Integer, List<MenuItem>> result = roleMenuPermissionService
+		Map<String, List<MenuItem>> result = roleMenuPermissionService
 				.queryAllMenuTreeByOperator(userInfo.getUser().getOperatorId());
 
 		List<Integer> menuItemsOfBaseMerchant = this.menuIdsByBaseMerchant(userInfo.getUser());
@@ -844,7 +798,7 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 
 		List<TreeTo> finList = Lists.newLinkedList();
 		// 取得第一階的父Tree
-		List<MenuItem> firstParentTree = result.get(0);
+		List<MenuItem> firstParentTree = getFirstParamTree(result);
 		try {
 			for (MenuItem firstMenuItem : firstParentTree) {
 				TreeTo cloneTree = new TreeTo();
@@ -852,10 +806,10 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 				finList.add(cloneTree);
 				
 				// 代表有子節點
-				List<MenuItem> childList = result.get(firstMenuItem.getMenuId());
+				List<MenuItem> childList = result.get(String.valueOf(firstMenuItem.getMenuId()));
 				if (!CollectionUtils.isEmpty(childList)) {
 					cloneTree.setList(
-							this.returnChildListWithBaseMerchant(result, childList, menuItemsOfBaseMerchant, isAdmin));
+							this.returnChildListWithBaseMerchant(cloneTree, result, childList, menuItemsOfBaseMerchant, isAdmin));
 				}
 			}
 		} catch (InvocationTargetException | IllegalAccessException e) {
@@ -865,7 +819,7 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 		return finList;
 	}
 
-	private List<TreeTo> returnChildListWithBaseMerchant(Map<Integer, List<MenuItem>> result, List<MenuItem> childList,
+	private List<TreeTo> returnChildListWithBaseMerchant(TreeTo parentMenu, Map<String, List<MenuItem>> result, List<MenuItem> childList,
 			List<Integer> menuItemsOfBaseMerchant, boolean isAdmin)
 			throws InvocationTargetException, IllegalAccessException {
 
@@ -878,12 +832,43 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 			if ((menuItemsOfBaseMerchant.contains(menuId) || CollectionUtils.isEmpty(menuItemsOfBaseMerchant))
 					|| isAdmin) {
 				// 代表有子節點
-				List<MenuItem> subList = result.get(menuId);
+				List<MenuItem> subList = result.get(String.valueOf(menuId));
+				TreeTo cloneTree = new TreeTo();
+				copyProperties(cloneTree, menuItem);
+				cloneTree.getParents().addAll(parentMenu.getParents());
+                cloneTree.getParents().add(parentMenu.getMenuId());
+				if (subList != null && !subList.isEmpty()) {
+					cloneTree.setList(
+							this.returnChildListWithBaseMerchant(cloneTree, result, subList, menuItemsOfBaseMerchant, isAdmin));
+				}
+
+				menuItemLists.add(cloneTree);
+			}
+
+		}
+
+		return menuItemLists;
+	}
+
+	private List<TreeTo> returnChildListWithBaseMerchant2(Map<String, List<MenuItem>> result, List<MenuItem> childList,
+														 List<Integer> menuItemsOfBaseMerchant, boolean isAdmin)
+			throws InvocationTargetException, IllegalAccessException {
+
+		List<TreeTo> menuItemLists = Lists.newLinkedList();
+		for (int i = 0; i < childList.size(); i++) {
+			MenuItem menuItem = childList.get(i);
+			Integer menuId = menuItem.getMenuId();
+
+			/* This is the filter of permissions in base merchant menu ids */
+			if ((menuItemsOfBaseMerchant.contains(menuId) || CollectionUtils.isEmpty(menuItemsOfBaseMerchant))
+					|| isAdmin) {
+				// 代表有子節點
+				List<MenuItem> subList = result.get(String.valueOf(menuId));
 				TreeTo cloneTree = new TreeTo();
 				copyProperties(cloneTree, menuItem);
 				if (subList != null && !subList.isEmpty()) {
 					cloneTree.setList(
-							this.returnChildListWithBaseMerchant(result, subList, menuItemsOfBaseMerchant, isAdmin));
+							this.returnChildListWithBaseMerchant2(result, subList, menuItemsOfBaseMerchant, isAdmin));
 				}
 
 				menuItemLists.add(cloneTree);
@@ -895,7 +880,7 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 	}
 
 	private boolean isAdmin(Integer operatorId) {
-		return roleOperatorCustomRepository.findRoleIdListByOperatorId(operatorId).contains(SUPER_MANAGER_ROLE_ID);
+		return roleOperatorCustomRepository.findRoleIdListByOperatorId(operatorId).contains(RoleIdConstant.SUPER_MANAGER_ROLE_ID);
 	}
 
 	@Override
@@ -973,7 +958,7 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 	}
 
 	@Override
-	@Cacheable(value = "findByMenuIdPermission", key = "#menuId")
+	@RedisCacheable(key = "findByMenuIdPermission:#menuId")
 	public List<OperatorInfoTo> findByMenuIdPermission(Integer menuId) {
 		List<Object[]> operators = operatorRepository.findByMenuIdPermission(menuId);
 		List<OperatorInfoTo> results = Lists.newLinkedList();
@@ -987,21 +972,23 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
 	}
 
 	@Override
+	@RedisCacheable(key = "'getAllTreeTo'")
 	public List<TreeTo> getAllTreeTo() {
 		Map<Integer, List<MenuItem>> result = roleMenuPermissionService.queryAllMenuTree();
-        return getAllTreeTo(result);
+		return getAllTreeTo(result);
 	}
 
 	@Override
 	public List<TreeTo> getAllTreeTo(Integer operatorId) {
-		Map<Integer, List<MenuItem>> result = roleMenuPermissionService.queryAllMenuTreeByOperator(operatorId);
+		Map<String, List<MenuItem>> result = roleMenuPermissionService.queryAllMenuTreeByOperator(operatorId);
 		return getAllTreeTo(result);
 	}
 	
-	private List<TreeTo> getAllTreeTo(Map<Integer, List<MenuItem>> result) {
+	private List<TreeTo> getAllTreeTo(Map<? extends Object, List<MenuItem>> result) {
 		List<TreeTo> finList = Lists.newLinkedList();
         // 取得第一階的父Tree
-        List<MenuItem> firstParentTree = result.get(0);
+		
+		List<MenuItem> firstParentTree = getFirstParamTree(result);
         try {
         	for (MenuItem firstMenuItem : firstParentTree) {
                 TreeTo cloneTree = new TreeTo();
@@ -1009,15 +996,26 @@ public class RoleMenuPermissionServiceImpl implements RoleMenuPermissionService 
                 finList.add(cloneTree);
  
                 // 代表有子節點
-                List<MenuItem> childList = result.get(firstMenuItem.getMenuId());
-                if (!CollectionUtils.isEmpty(childList)){
+                List<MenuItem> childList = result.get(String.valueOf(firstMenuItem.getMenuId()));
+                if(CollectionUtils.isEmpty(childList)) {
+                	childList = result.get(firstMenuItem.getMenuId());
+                }
+                if (childList == null || !CollectionUtils.isEmpty(childList)){
                     cloneTree.setList(this.returnChildList(result, childList));
                 }
             }
-        } catch (InvocationTargetException | IllegalAccessException e) {
+        } catch (Exception e) {
             LOGGER.error("getAllTreeTo error", e);
         }
         return finList;
+	}
+
+	private List<MenuItem> getFirstParamTree(Map<? extends Object, List<MenuItem>> result) {
+		List<MenuItem> firstParentTree = result.get("0");
+        if(firstParentTree == null) {
+        	firstParentTree = result.get(0);
+        }
+		return firstParentTree;
 	}
 
 }

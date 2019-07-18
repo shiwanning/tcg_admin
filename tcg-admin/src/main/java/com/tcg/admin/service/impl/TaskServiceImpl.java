@@ -14,8 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.google.common.collect.Lists;
-import com.tcg.admin.common.constants.IErrorCode;
-import com.tcg.admin.common.constants.TaskStatus;
+import com.tcg.admin.common.constants.TaskConstant;
+import com.tcg.admin.common.constants.TaskStateConstant;
 import com.tcg.admin.common.error.AdminErrorCode;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.model.Task;
@@ -40,7 +40,7 @@ public class TaskServiceImpl extends BaseDAORepository implements TaskService {
 
     @Override
     public Task createTask(Task task) {
-        task.setStatus(TaskStatus.OPEN_STATUS);
+        task.setStatus(TaskConstant.OPEN_STATUS);
         return taskRepository.saveAndFlush(task);
     }
 
@@ -59,7 +59,7 @@ public class TaskServiceImpl extends BaseDAORepository implements TaskService {
     @Override
     public void cancelTask(Integer taskId) {
         Task task = taskRepository.findOne(taskId);
-        task.setStatus(TaskStatus.CANCELLED_STATUS);
+        task.setStatus(TaskConstant.CANCELLED_STATUS);
         taskRepository.saveAndFlush(task);
     }
     
@@ -91,16 +91,16 @@ public class TaskServiceImpl extends BaseDAORepository implements TaskService {
 	public Task getTask(Integer taskId){
 		Task task = taskRepository.findTask(taskId);
 		if (task == null) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, "Task Not Found");
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, "Task Not Found");
 		}
 		return task;
 	}
 
     @Override
     public Task getTaskByMerchantId(String subSystemTask){
-        Task task = taskRepository.findBySubSystemTaskAndStateId(subSystemTask, CREATE_MERCHANT_ERROR);
+        Task task = taskRepository.findBySubSystemTaskAndStateId(subSystemTask, TaskStateConstant.CREATE_MERCHANT_ERROR);
         if (task == null) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, "Task Not Found");
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, "Task Not Found");
         }
         return task;
     }

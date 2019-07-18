@@ -25,7 +25,7 @@ public interface IMenuCategoryMenuRepository extends JpaRepository<MenuCategoryM
     List<MenuCategoryMenu> findByMenuCategoryNames(String menuCategoryName);
 
     @Query("select menuCategoryMenu.menuId from MenuCategoryMenu menuCategoryMenu where menuCategoryMenu.menuCategoryName = (?1) and menuCategoryMenu.menuId in (?2)")
-    List<Integer> selectMenuByCategoryNameAndMenuIds(String menuCategoryName, List<Integer> menuId);
+    Set<Integer> selectMenuByCategoryNameAndMenuIds(String menuCategoryName, List<Integer> menuId);
 
     @Modifying
     @Query("delete from MenuCategoryMenu menuCategoryMenu where menuCategoryMenu.menuCategoryName = (?1)")
@@ -34,6 +34,10 @@ public interface IMenuCategoryMenuRepository extends JpaRepository<MenuCategoryM
     @Modifying
     @Query("delete from MenuCategoryMenu menuCategoryMenu where menuCategoryMenu.menuCategoryName = (?1) and menuCategoryMenu.menuId in (?2)")
     void deleteMenuByCategoryNameAndMenuIds(String menuCategoryName, List<Integer> menuId);
+
+    @Modifying
+    @Query("delete from MenuCategoryMenu menuCategoryMenu where menuCategoryMenu.menuCategoryName = (?1) ")
+    void deleteMenuByCategoryName(String menuCategoryName);
 
     @Query("select distinct menuCategoryMenu.menuId from MenuCategoryMenu menuCategoryMenu,MenuItem menuItem where menuCategoryMenu.menuCategoryName !='SYSTEM' and menuItem.menuId=menuCategoryMenu.menuId ")
     List<Integer>  queryByMenuCategoryMenu();
@@ -46,4 +50,8 @@ public interface IMenuCategoryMenuRepository extends JpaRepository<MenuCategoryM
 
     @Query("select distinct menuCategoryMenu.menuId from MenuCategoryMenu menuCategoryMenu,MenuItem menuItem where menuCategoryMenu.menuCategoryName !='SYSTEM' and menuItem.menuId=menuCategoryMenu.menuId and menuItem.isButton =1")
     List<Integer>  queryByMenuId();
+
+    @Query("select distinct menuCategoryMenu.menuCategoryName from MenuCategoryMenu menuCategoryMenu,MenuItem menuItem where menuCategoryMenu.menuCategoryName !='SYSTEM' and menuItem.menuId=menuCategoryMenu.menuId and menuCategoryMenu.menuId =(?1)")
+    List<String>  findMenuCategoryMenuByMenuId (Integer menuId);
+
 }

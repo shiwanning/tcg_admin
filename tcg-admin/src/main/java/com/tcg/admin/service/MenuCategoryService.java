@@ -26,4 +26,6 @@ public interface MenuCategoryService {
     List<Merchant> queryAllMerchantByCategoryName(String menuCategoryName) throws AdminServiceBaseException;
 
     List<MenuCategoryMenu> genAndSaveSystemMenuList();
+
+    void reCorrelateRefresh(List<MenuCategoryMenu> menuCategoryMenus);
 }

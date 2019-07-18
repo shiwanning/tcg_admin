@@ -17,6 +17,9 @@ import javax.persistence.SequenceGenerator;
 import javax.persistence.Table;
 import javax.validation.constraints.NotNull;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+
 /**
  * 
  * <p>Title: com.tcg.admin.model.MenuItem</p>
@@ -279,14 +282,6 @@ public class MenuItem extends BaseEntity {
 		this.isButton = isButton;
 	}
 
-//	public MenuItemAux getAuxData() {
-//		return auxData;
-//	}
-//
-//	public void setAuxData(MenuItemAux auxData) {
-//		this.auxData = auxData;
-//	}
-
 	public Map<String, ApiLabel> getLabels() {
 		return labels;
 	}
@@ -315,11 +310,26 @@ public class MenuItem extends BaseEntity {
 
 	public void setMenuType(Integer menuType) {	this.menuType = menuType; }
 
-//	public Integer getMenuCategoryId() {
-//		return menuCategoryId;
-//	}
-//
-//	public void setMenuCategoryId(Integer menuCategoryId) {
-//		this.menuCategoryId = menuCategoryId;
-//	}
+	public MenuItem copy() {
+		MenuItem cloneInstance = new MenuItem();
+		cloneInstance.setCreateTime(super.getCreateTime());
+		cloneInstance.setAccessType(accessType);
+		cloneInstance.setDescription(description);
+		cloneInstance.setDisplayOrder(displayOrder);
+		cloneInstance.setIcon(icon);
+		cloneInstance.setIsButton(isButton);
+		cloneInstance.setIsDisplay(isDisplay);
+		cloneInstance.setIsLeaf(isLeaf);
+		cloneInstance.setLabels(Maps.newHashMap(labels));
+		cloneInstance.setMenuCategoryMenu(Lists.newLinkedList(menuCategoryMenu));
+		cloneInstance.setMenuId(menuId);
+		cloneInstance.setMenuName(menuName);
+		cloneInstance.setMenuType(menuType);
+		cloneInstance.setParentId(parentId);
+		cloneInstance.setTreeLevel(treeLevel);
+		cloneInstance.setUpdateTime(super.getUpdateTime());
+		cloneInstance.setUrl(url);
+		return cloneInstance;
+	}
+	
 }

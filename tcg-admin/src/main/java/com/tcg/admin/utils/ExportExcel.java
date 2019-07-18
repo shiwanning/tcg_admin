@@ -59,12 +59,12 @@ public class ExportExcel {
 
                 // 表头字体样式
                 HSSFFont columnHeadFont = getDefaultColumnHeadFont(workbook);
-                HSSFCellStyle columnHeadStyle = getColumnHeadStyle(workbook, columnHeadFont);
+                HSSFCellStyle columnHeadStyle = ExcelUtil.getColumnHeadStyle(workbook, columnHeadFont);
 
                 //主要内容样式
                 HSSFFont font = getMainDefaultFont(workbook);
                 
-                HSSFCellStyle style = getDefaultMainCellStyle(workbook, font);
+                HSSFCellStyle style = ExcelUtil.getDefaultMainCellStyle(workbook, font);
                 
                 /**
                  * 合并单元格
@@ -105,17 +105,7 @@ public class ExportExcel {
                 }
 
                 //主要内容
-                for (int i = 0; i < array.size(); i++) {
-                    HSSFRow row = sheet.createRow(3+i);
-                    row.setHeight((short) 550);
-                    JSONObject obj = JSONObject.fromObject(array.get(i));
-                    for (int j = 0; j < attrName.length; j++) {
-                        HSSFCell cell = row.createCell(j);
-
-                        cell.setCellValue(null == obj.get(attrName[j]) ? "" : obj.get(attrName[j]) + "");
-                        cell.setCellStyle(style);
-                    }
-                }
+                setMainData(sheet, style, array, attrName);
             }
 
             response.setContentType("application/vnd.ms-excel");
@@ -129,6 +119,21 @@ public class ExportExcel {
         	LOGGER.error("export excel error", e);
         }
     }
+
+	private static void setMainData(HSSFSheet sheet, HSSFCellStyle style, JSONArray array, String[] attrName) {
+		for (int i = 0; i < array.size(); i++) {
+            HSSFRow row = sheet.createRow(3+i);
+            row.setHeight((short) 550);
+            JSONObject obj = JSONObject.fromObject(array.get(i));
+            for (int j = 0; j < attrName.length; j++) {
+                HSSFCell cell = row.createCell(j);
+
+                cell.setCellValue(null == obj.get(attrName[j]) ? "" : obj.get(attrName[j]) + "");
+                cell.setCellStyle(style);
+            }
+        }
+		
+	}
 
 	private static HSSFFont getMainDefaultFont(HSSFWorkbook workbook) {
 		 HSSFFont font = workbook.createFont();
@@ -167,44 +172,6 @@ public class ExportExcel {
             sheet.setDefaultColumnStyle((short) i, sheetStyle);
         }
 		return sheetStyle;
-	}
-
-	private static HSSFCellStyle getDefaultMainCellStyle(HSSFWorkbook workbook, HSSFFont font) {
-		HSSFCellStyle style = workbook.createCellStyle();
-        style.setFont(font);
-        style.setAlignment(HSSFCellStyle.ALIGN_CENTER);// 左右居中
-        style.setVerticalAlignment(HSSFCellStyle.VERTICAL_CENTER);// 上下居中
-        style.setLocked(true);
-        style.setWrapText(true);// 自动换行
-        //设置边框样式
-        style.setTopBorderColor(HSSFColor.BLACK.index);
-        style.setBorderTop(HSSFCellStyle.BORDER_MEDIUM);
-        style.setBottomBorderColor(HSSFColor.BLACK.index); // 设置单元格的边框颜色
-        style.setBorderBottom(HSSFCellStyle.BORDER_MEDIUM); // 设置单元格的边框为粗体
-        style.setLeftBorderColor(HSSFColor.BLACK.index);// 左边框的颜色
-        style.setBorderLeft(HSSFCellStyle.BORDER_MEDIUM);// 边框的大小
-        style.setRightBorderColor(HSSFColor.BLACK.index);// 右边框的颜色
-        style.setBorderRight(HSSFCellStyle.BORDER_MEDIUM);// 边框的大小
-		return style;
-	}
-
-	private static HSSFCellStyle getColumnHeadStyle(HSSFWorkbook workbook, HSSFFont columnHeadFont) {
-		HSSFCellStyle columnHeadStyle = workbook.createCellStyle();
-        columnHeadStyle.setFont(columnHeadFont);
-        columnHeadStyle.setAlignment(HSSFCellStyle.ALIGN_CENTER);// 左右居中
-        columnHeadStyle.setVerticalAlignment(HSSFCellStyle.VERTICAL_CENTER);// 上下居中
-        columnHeadStyle.setLocked(true);
-        columnHeadStyle.setWrapText(true);// 自动换行
-        //设置边框样式
-        columnHeadStyle.setTopBorderColor(HSSFColor.BLACK.index);
-        columnHeadStyle.setBorderTop(HSSFCellStyle.BORDER_MEDIUM);
-        columnHeadStyle.setBottomBorderColor(HSSFColor.BLACK.index); // 设置单元格的边框颜色
-        columnHeadStyle.setBorderBottom(HSSFCellStyle.BORDER_MEDIUM); // 设置单元格的边框为粗体
-        columnHeadStyle.setLeftBorderColor(HSSFColor.BLACK.index);// 左边框的颜色
-        columnHeadStyle.setBorderLeft(HSSFCellStyle.BORDER_MEDIUM);// 边框的大小
-        columnHeadStyle.setRightBorderColor(HSSFColor.BLACK.index);// 右边框的颜色
-        columnHeadStyle.setBorderRight(HSSFCellStyle.BORDER_MEDIUM);// 边框的大小
-		return columnHeadStyle;
 	}
 
 	private static HSSFCellStyle getDefaultHeadStyle(HSSFWorkbook workbook, HSSFFont headfont) {

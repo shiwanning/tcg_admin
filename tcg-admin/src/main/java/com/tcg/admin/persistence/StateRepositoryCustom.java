@@ -11,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 
-import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.model.State;
 
 @Repository
@@ -22,7 +21,7 @@ public class StateRepositoryCustom extends BaseDAORepository {
     @PersistenceContext(unitName = "persistenceUnit")
     private EntityManager entityManager;
 
-	public List<State> getStateListByType(String type)	throws AdminServiceBaseException {
+	public List<State> getStateListByType(String type) {
 		
 		/* Query String*/
 		StringBuilder sb = new StringBuilder();

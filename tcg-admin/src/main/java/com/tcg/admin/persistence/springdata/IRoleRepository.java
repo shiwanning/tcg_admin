@@ -45,4 +45,14 @@ public interface IRoleRepository extends JpaRepository<Role, Integer>, JpaSpecif
 
     @Query("select r from Role r where r.roleId in ?1")
     List<Role> findByRoleIds(List<Integer> roleIds);
+
+    @Query("select r.roleId, r.roleName from Role r where r.activeFlag = ?1 order by roleId")
+	List<Object[]> findByActiveFlag(int activeFlag);
+
+
+    @Query("select count(ro) from RoleOperator ro, Role r where ro.roleId=r.roleId AND ro.operatorId=?1 AND r.googleOtpActive = 1 ")
+    int countGoogleActiveByOperator(Integer operatorId);
+
+    @Query(value = "SELECT ur.* FROM US_ROLE ur,US_ROLE_OPERATOR uro where uro.role_id = ur.ROLE_ID and uro.OPERATOR_ID =?1 and active_flag = 1",nativeQuery = true)
+    List<Role> findOperatorAllRoleByOperatorId(Integer operatorId);
 }

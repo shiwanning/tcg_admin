@@ -57,7 +57,7 @@ public class CategoryResource {
     @PostMapping("/createAnnouncement")
 	public JsonResponseT<Category> createCategory(@RequestBody Category category) throws AdminServiceBaseException {
 		JsonResponseT<Category> response = new JsonResponseT<>(true);
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		String operator = userInfo.getUser().getOperatorId().toString();
 		category.setCreateOperator(operator);
 		category.setUpdateOperator(operator);
@@ -67,7 +67,7 @@ public class CategoryResource {
 
 	@PutMapping
 	public JsonResponseT<Boolean> updateCategory(@RequestBody Category category) throws AdminServiceBaseException {
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		String operator = userInfo.getUser().getOperatorId().toString();
 		category.setUpdateOperator(operator);
 		categoryService.updateCategory(category);
@@ -83,7 +83,7 @@ public class CategoryResource {
 	@PostMapping("/categoryRole/")
 	public JsonResponseT<CategoryRole> correlateCategory(@RequestBody CategoryRoleCreateTO categoryRole) throws AdminServiceBaseException {
 		JsonResponseT<CategoryRole> response = new JsonResponseT<>(true);
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		String updateOperator = userInfo.getUser().getOperatorId().toString();
 		categoryroleService.correlateCategory(categoryRole.getCategoryIdList(), categoryRole.getRoleList(),updateOperator);
 		return response;

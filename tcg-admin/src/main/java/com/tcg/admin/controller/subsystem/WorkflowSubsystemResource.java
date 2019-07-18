@@ -32,9 +32,11 @@ import com.tcg.admin.service.WorkFlowService;
 import com.tcg.admin.service.impl.IMService;
 import com.tcg.admin.service.impl.OperatorLoginService;
 import com.tcg.admin.to.TaskTO;
+import com.tcg.admin.to.UpdateTaskResult;
 import com.tcg.admin.to.UserInfo;
 import com.tcg.admin.to.response.JsonResponse;
 import com.tcg.admin.to.response.JsonResponseT;
+import com.tcg.admin.utils.AuthorizationUtils;
 
 import io.swagger.annotations.Api;
 
@@ -63,13 +65,12 @@ public class WorkflowSubsystemResource {
      */
     @PutMapping("/task")
 	public JsonResponseT<Task> createTask(
-	        @RequestHeader(value = "Authorization", required = false)  String token,
 	        HttpServletRequest request,
                                @RequestParam(value = "subsystemTaskId", required = false) String subsysTaskId, 
                                @RequestParam(value = "stateId", required = false) Integer stateId,
                                @RequestParam(value = "taskDescription", required = false) String taskDescription, 
                                @RequestParam(value = "merchantCode", required = false) String merchantCode,
-                               @RequestParam(value = "isSystem", required = false) boolean isSystem) throws UnsupportedEncodingException {
+                               @RequestParam(value = "isSystem", required = false) boolean isSystem) {
 
     	String localSubsysTaskId = subsysTaskId;
     	Integer localStateId = stateId;
@@ -96,7 +97,7 @@ public class WorkflowSubsystemResource {
 		taskTO.setTaskDescription(localTaskDescription);
 		taskTO.setMerchantCode(localMerchantCode);
 		if (!localIsSystem) {
-			userInfo = operatorLoginService.getSessionUser(token);
+			userInfo = RequestHelper.getCurrentUser();
 			taskTO.setOperatorName(userInfo.getUser().getOperatorName());
 		}
 		Task task = workflowManager.createTask(taskTO);
@@ -110,11 +111,11 @@ public class WorkflowSubsystemResource {
 	        HttpServletRequest request,
 	        @RequestParam(value="taskId", required = false) Integer taskId,  
 	        @RequestParam(value="stateId", required = false) Integer stateId,
-			@RequestHeader(value = "Authorization", required = false)  String token) throws UnsupportedEncodingException {
+	        @RequestHeader(value = "close", required = true, defaultValue="false") Boolean close			) {
         
     	Integer localTaskId = taskId;
     	Integer localStateId = stateId;
-    	
+    	Boolean localClose = close;
     	
         if(stateId == null) {
             BehaviorRequestWrapper br = (BehaviorRequestWrapper) request;
@@ -122,12 +123,14 @@ public class WorkflowSubsystemResource {
             Map<String, String> parameterMap = RequestHelper.getMapFromUrlFormat(body);
             localStateId = parameterMap.get("stateId") == null ? null : Ints.tryParse(parameterMap.get("stateId"));
             localTaskId = parameterMap.get("taskId") == null ? null : Ints.tryParse(parameterMap.get("taskId"));
+            localClose = Boolean.valueOf(parameterMap.get("close"));
         }
         
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(token);
+		UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 		TaskTO taskTO = new TaskTO();
 		taskTO.setTaskId(localTaskId);
 		taskTO.setStateId(localStateId);
+		taskTO.setClose(localClose);
 		workflowManager.updateTask(taskTO, userInfo);
 		callImServiceeByTaskId(taskId, true);
 		return new JsonResponse(true);
@@ -142,7 +145,7 @@ public class WorkflowSubsystemResource {
 	        HttpServletRequest request,
 	        @PathVariable("taskId") Integer taskId, 
 	        @RequestHeader(value = "Authorization", required = false)  String token, 
-	        @RequestParam(value = "stateId", required = false) Integer nextStateId) throws UnsupportedEncodingException {
+	        @RequestParam(value = "stateId", required = false) Integer nextStateId) {
         
     	Integer localNextStateId = nextStateId;
     	
@@ -154,7 +157,7 @@ public class WorkflowSubsystemResource {
         }
         
 		UserInfo<Operator> userInfo;
-		userInfo = operatorLoginService.getSessionUser(token);
+		userInfo = AuthorizationUtils.getSessionUser(token);
 		TaskTO taskTO = new TaskTO();
 		taskTO.setTaskId(taskId);
 		taskTO.setStateId(localNextStateId);
@@ -167,10 +170,9 @@ public class WorkflowSubsystemResource {
 	處理異常情況的API,如果產生異常的task, 透過這個api可以關掉(just for create merchant)
 	 */
     @DeleteMapping("/merchantId/{merchantId}")
-	public JsonResponse closeTaskByMerchantId(@PathVariable("merchantId") String merchantId, 
-	        @RequestHeader(value = "Authorization", required = false)  String token) {
+	public JsonResponse closeTaskByMerchantId(@PathVariable("merchantId") String merchantId) {
 		UserInfo<Operator> userInfo;
-		userInfo = operatorLoginService.getSessionUser(token);
+		userInfo = RequestHelper.getCurrentUser();
 		TaskTO taskTO = new TaskTO();
 		taskTO.setSubsysTaskId(merchantId);
 		Task task = workflowManager.closeTaskByMerchantId(taskTO, userInfo);
@@ -178,7 +180,6 @@ public class WorkflowSubsystemResource {
 		return new JsonResponse(true);
 	}
 
-    @Deprecated
     @DeleteMapping("/task/closeTaskWOChecking/{taskId}")
 	public JsonResponse closeTask(@PathVariable("taskId") Integer taskId) {
 		UserInfo<Operator> userInfo = new UserInfo<>();
@@ -196,7 +197,7 @@ public class WorkflowSubsystemResource {
     public JsonResponse closeTaskById(
             HttpServletRequest request,
             @PathVariable("taskId") Integer taskId, 
-            @RequestParam(value="stateId", required = false) Integer nextStateId) throws UnsupportedEncodingException {
+            @RequestParam(value="stateId", required = false) Integer nextStateId) {
     	Integer localNextStateId = nextStateId;
         if(nextStateId == null) {
             BehaviorRequestWrapper br = (BehaviorRequestWrapper) request;
@@ -221,15 +222,17 @@ public class WorkflowSubsystemResource {
     @PostMapping("/task/lock/{taskId}")
 	public JsonResponse lockTask(@RequestHeader(value = "Authorization", required = false)String token, 
 	        @PathVariable("taskId")Integer taskId) {
-		workflowManager.undertakeTask(operatorLoginService.getSessionUser(token), taskId);
-		callImServiceeByTaskId(taskId, false);
+    	UpdateTaskResult updateTaskResult = workflowManager.undertakeTask(AuthorizationUtils.getSessionUser(token), taskId);
+		if(updateTaskResult.getIsUpdate()) {
+			callImServiceeByTaskId(taskId, false);
+		}
 		return new JsonResponse(true);
 	}
 
     @DeleteMapping("/task/lock/{taskId}")
 	public JsonResponse unlockTask(@RequestHeader(value = "Authorization", required = false) String token, 
 	        @PathVariable("taskId")Integer taskId) {
-		workflowManager.withdrawTask(operatorLoginService.getSessionUser(token), taskId);
+		workflowManager.withdrawTask(AuthorizationUtils.getSessionUser(token), taskId);
 		callImServiceeByTaskId(taskId, true);
 		return new JsonResponse(true);
 	}
@@ -238,7 +241,7 @@ public class WorkflowSubsystemResource {
 	public JsonResponseT<List<String>> retrieveTaskViewers(@RequestHeader(value = "Authorization", required = false) String token, 
 	        @PathVariable("taskId")Integer taskId){
 		JsonResponseT<List<String>> response=new JsonResponseT<>(true);
-		response.setValue(workflowManager.getTaskViewers(operatorLoginService.getSessionUser(token),taskId));
+		response.setValue(workflowManager.getTaskViewers(AuthorizationUtils.getSessionUser(token),taskId));
 		return response;
 	}
 	
@@ -249,7 +252,7 @@ public class WorkflowSubsystemResource {
     public JsonResponseT<Object> counterClaimTask(@RequestParam(value="taskId", required = false) int taskId) {
 
         JsonResponseT<Object> jsonResponseT = new JsonResponseT<>(true);
-        workflowManager.counterClaimTask(operatorLoginService.getSessionUser(RequestHelper.getToken()), taskId);
+        workflowManager.counterClaimTask(RequestHelper.getCurrentUser(), taskId);
         callImServiceeByTaskId(taskId, true);
         jsonResponseT.setMessage(AdminErrorCode.REQUEST_SUCCESS);
 

@@ -2,7 +2,6 @@ package com.tcg.admin.persistence.springdata;
 
 import java.util.List;
 
-import com.tcg.admin.model.BpmGroup;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;

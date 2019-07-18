@@ -22,6 +22,9 @@ public class AnnouncementTO {
     private String cnContent;
 
     private String startTime;
+    
+    private String maintenanceStartTime;
+    private String maintenanceEndTime;
 
     private String merchants;
 
@@ -138,4 +141,21 @@ public class AnnouncementTO {
     public void setVendor(String vendor) {
         this.vendor = vendor;
     }
+
+	public String getMaintenanceStartTime() {
+		return maintenanceStartTime;
+	}
+
+	public void setMaintenanceStartTime(String maintenanceStartTime) {
+		this.maintenanceStartTime = maintenanceStartTime;
+	}
+
+	public String getMaintenanceEndTime() {
+		return maintenanceEndTime;
+	}
+
+	public void setMaintenanceEndTime(String maintenanceEndTime) {
+		this.maintenanceEndTime = maintenanceEndTime;
+	}
+	
 }

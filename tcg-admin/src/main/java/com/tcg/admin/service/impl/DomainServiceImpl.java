@@ -3,9 +3,9 @@ package com.tcg.admin.service.impl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import com.tcg.admin.cache.RedisCacheable;
 import com.tcg.admin.model.DomainProperties;
 import com.tcg.admin.persistence.springdata.IDomainPropertiesRepository;
 import com.tcg.admin.service.DomainService;
@@ -19,7 +19,7 @@ public class DomainServiceImpl implements DomainService {
 	private IDomainPropertiesRepository domainPropertiesRepository;
 	
 	@Override
-	@Cacheable(value="cache-ap-admin", key="'domainProperties:' + #domainName")
+	@RedisCacheable(key="'domainProperties:' + #host")
 	public DomainProperties getDomainProperties(String host) {
 		
 		LOGGER.info("get domain properties for host: {}", host);

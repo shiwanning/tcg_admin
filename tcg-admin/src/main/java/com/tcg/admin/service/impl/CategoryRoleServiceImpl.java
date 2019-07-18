@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.google.common.collect.Lists;
-import com.tcg.admin.common.constants.IErrorCode;
 import com.tcg.admin.common.error.AdminErrorCode;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.model.CategoryRole;
@@ -53,7 +52,7 @@ public class CategoryRoleServiceImpl implements CategoryRoleService {
      */
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
-    public void correlateCategory(List<Integer> categoryId, List<Integer> roleList, String updatOperator) throws AdminServiceBaseException {
+    public void correlateCategory(List<Integer> categoryId, List<Integer> roleList, String updatOperator) {
         try {
             /* category 是否存在 */
             if (categoryRepository.findOne(categoryId.get(0)) == null) {
@@ -69,33 +68,33 @@ public class CategoryRoleServiceImpl implements CategoryRoleService {
             List<CategoryRole> oriCategoryRoleList = categoryRoleRepository.findCategoryRoleByRoleId(roleList);
 
             if (CollectionUtils.isNotEmpty(oriCategoryRoleList)) {
-               // categoryRoleRepository.delete(oriCategoryRoleList);
                 categoryRoleRepository.deleteByRoleId(roleList);
             }
+            
+            if(CollectionUtils.isEmpty(roleList) || CollectionUtils.isEmpty(categoryId)) {
+            	return;
+            }
+            
             /* 重新設定Category與role連結關係 */
             List<CategoryRole> reSetupCategoryRoleList = new ArrayList<>();
 
-            if (CollectionUtils.isNotEmpty(roleList)) {
-                for (Integer roleId : roleList) {
-                	if(CollectionUtils.isNotEmpty(categoryId)){
-                		for(Integer id: categoryId){
-                			 CategoryRole categoryRoleOp;
-                             categoryRoleOp = new CategoryRole();
-                             categoryRoleOp.setCategoryId(id);
-                             categoryRoleOp.setRoleId(roleId);
-                             categoryRoleOp.setCreateOperator(updatOperator);
-                             categoryRoleOp.setUpdateOperator(updatOperator);
-                             reSetupCategoryRoleList.add(categoryRoleOp);
-                		}
-                	}
-                   
-                }
-                categoryRoleRepository.save(reSetupCategoryRoleList);
+            for (Integer roleId : roleList) {
+        		for(Integer id: categoryId){
+        			 CategoryRole categoryRoleOp;
+                     categoryRoleOp = new CategoryRole();
+                     categoryRoleOp.setCategoryId(id);
+                     categoryRoleOp.setRoleId(roleId);
+                     categoryRoleOp.setCreateOperator(updatOperator);
+                     categoryRoleOp.setUpdateOperator(updatOperator);
+                     reSetupCategoryRoleList.add(categoryRoleOp);
+        		}
             }
+            categoryRoleRepository.save(reSetupCategoryRoleList);
+
         } catch (AdminServiceBaseException usbe) {
             throw usbe;
         } catch (Exception e) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, e.getMessage(), e);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
         }
     }
 }

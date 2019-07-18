@@ -5,6 +5,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.tcg.admin.model.*;
+import com.tcg.admin.persistence.springdata.IBehaviorLogRepository;
+import com.tcg.admin.service.OperatorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,25 +15,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tcg.admin.common.constants.IErrorCode;
 import com.tcg.admin.common.constants.LoginConstant;
 import com.tcg.admin.common.constants.LoginType;
-import com.tcg.admin.common.constants.SessionConstants;
 import com.tcg.admin.common.error.AdminErrorCode;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.common.helper.RequestHelper;
-import com.tcg.admin.controller.core.session.SessionAttribute;
-import com.tcg.admin.model.DomainProperties;
-import com.tcg.admin.model.Operator;
-import com.tcg.admin.model.OperatorPasswordHistory;
-import com.tcg.admin.model.OperatorProfile;
 import com.tcg.admin.persistence.OperatorPasswordHistoryRepositoryCustom;
 import com.tcg.admin.persistence.springdata.IOperatorRepository;
 import com.tcg.admin.service.AuthService;
 import com.tcg.admin.service.DomainService;
 import com.tcg.admin.service.RoleMenuPermissionService;
 import com.tcg.admin.to.UserInfo;
-import com.tcg.admin.utils.shiro.ShiroUtils;
+import com.tcg.admin.utils.AuthorizationUtils;
 
 @Service
 @Transactional
@@ -53,6 +49,13 @@ public class OperatorLoginService extends CommonLoginService<Operator> {
     
     @Autowired
     private DomainService domainService;
+
+    @Autowired
+    private OperatorService operatorService;
+
+    @Autowired
+    private IBehaviorLogRepository behaviorLogRepository;
+
     
     @Autowired
     protected void initRepository(IOperatorRepository operatorRepository) {
@@ -77,29 +80,30 @@ public class OperatorLoginService extends CommonLoginService<Operator> {
         	}
         	
             newOperatorInfo = super.login(operatorName, password, loginType);
-            String token = ShiroUtils.doOperatorLogin(operatorName, newOperatorInfo.getUser().getPassword());
-            newOperatorInfo.setToken(token);
+            AuthorizationUtils.doOperatorLogin(newOperatorInfo);
+            
             List<Map<String,String>> merchList = roleMenuPermissionService.getMerchants(newOperatorInfo);
             List<Map<String,String>> companies = roleMenuPermissionService.getCompanies(newOperatorInfo);
             List<Map<String,String>> allMerchants = roleMenuPermissionService.getAllMerchant();
             List<Map<String,String>> allCompanies = roleMenuPermissionService.getAllCompanies();
             
-            super.setSessionValue(newOperatorInfo.getToken(), SessionConstants.SESSION_KEY_USER, newOperatorInfo);
-            super.setSessionValue(newOperatorInfo.getToken(), SessionConstants.OPERATOR_MERCHANTS,
-                                  merchList);
-            super.setSessionValue(newOperatorInfo.getToken(), SessionAttribute.TOKEN, newOperatorInfo.getToken());
             newOperatorInfo.setCompanies(objectMapper.writeValueAsString(companies));
             newOperatorInfo.setMerchants(objectMapper.writeValueAsString(merchList));
             newOperatorInfo.setAllMerchants(objectMapper.writeValueAsString(allMerchants));
             newOperatorInfo.setAllCompanies(objectMapper.writeValueAsString(allCompanies));
+            
             LOGGER.info("Loggin Operator success!!");
+
+            if(!AuthorizationUtils.isNeedOperation(newOperatorInfo.getUser().getOperatorId())){
+                updateBehaviorLogLogSuccess(operatorName, newOperatorInfo.getUser().getOperatorId());
+            }
 
             return newOperatorInfo;
 
         } catch (AdminServiceBaseException e) {
             throw e;
         } catch (Exception e) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, e.getMessage(), e);
         }
     }
 
@@ -137,6 +141,9 @@ public class OperatorLoginService extends CommonLoginService<Operator> {
         return userInfoMap.get(userName);
     }
 
+    public void removeAllUser(){
+        userInfoMap.clear();
+    }
     @Override
     public UserInfo<Operator> initUserInfo(String userName, Operator userRecord) {
         userInfoMap.remove(userName);
@@ -156,26 +163,49 @@ public class OperatorLoginService extends CommonLoginService<Operator> {
         userInfoMap.put(userName, userInfo);
     }
 
-    public void loginFromOtp(Integer operatorId) {
+    public Date loginFromOtp(Integer operatorId) {
         Operator operator = userRepositoryBase.findOne(operatorId);
-        OperatorProfile operatorProfile = operatorProfileRepository.findOne(operatorId);
+        OperatorProfile operatorProfile = operator.getProfile();
         
         operator.setErrorCount(0);
+        operator.setGoogleErrorCount(0);
         operator.setErrorTime(null);
         
         operatorProfile.setLastLoginTime(new Date());
-        
-        saveLoginLog(operatorProfile, RequestHelper.getIp());
+
+        operatorProfile.setLastLoginIP(RequestHelper.getIp());
+        operatorProfile.setLastLoginTime(new Date());
+        operatorProfile.setUpdateTime(new Date());
+
         updateUserRecord(operator);
         authService.saveLastPassTime(operatorId);
+        return  operatorProfile.getLastLoginTime();
     }
 
     public void lockUser(UserInfo<Operator> userInfo) {
         Operator newOp = userRepositoryBase.findOne(userInfo.getUser().getOperatorId());
-        newOp.setActiveFlag(LoginConstant.ACTIVE_FLAG_LOGIN_FORBID.getStatusCode());
-        userInfo.setType(LoginConstant.ACTIVE_FLAG_LOGIN_FORBID.getStatusCode());
+        newOp.setActiveFlag(LoginConstant.ACTIVE_FLAG_TERMINATE_LOGIN.getStatusCode());
+        userInfo.setType(LoginConstant.ACTIVE_FLAG_TERMINATE_LOGIN.getStatusCode());
+
+        initUserInfo(newOp.getOperatorName(), newOp);
         super.updateUserRecord(newOp);
     }
+
+    private void updateBehaviorLogLogSuccess(String userName, Integer operatorId){
+
+        Operator newOp = userRepositoryBase.findOne(operatorId);
+
+        BehaviorLog currentLoginBehaviorLog = operatorService.getCurrentLoginBehaviorLog(userName);
+
+        if(currentLoginBehaviorLog != null){
+            currentLoginBehaviorLog.setRemark("SUCCESS");
+            currentLoginBehaviorLog.setEndProcessDate(newOp.getProfile().getLastLoginTime());
+            behaviorLogRepository.saveAndFlush(currentLoginBehaviorLog);
+        }
+    }
+
+
+
 
 
 }

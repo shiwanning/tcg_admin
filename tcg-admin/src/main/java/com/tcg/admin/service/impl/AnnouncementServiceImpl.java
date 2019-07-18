@@ -11,6 +11,8 @@ import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -22,8 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.tcg.admin.common.constants.SessionConstants;
-import com.tcg.admin.common.exception.AdminServiceBaseException;
+import com.tcg.admin.cache.RedisCacheEvict;
 import com.tcg.admin.common.helper.RequestHelper;
 import com.tcg.admin.model.Announcement;
 import com.tcg.admin.model.Operator;
@@ -33,7 +34,8 @@ import com.tcg.admin.persistence.springdata.IAnnouncementReadRepository;
 import com.tcg.admin.persistence.springdata.IAnnouncementRepository;
 import com.tcg.admin.service.AnnouncementService;
 import com.tcg.admin.service.FileService;
-import com.tcg.admin.service.OperatorAuthenticationService;
+import com.tcg.admin.service.RoleMenuPermissionService;
+import com.tcg.admin.service.TacCacheService;
 import com.tcg.admin.to.AnnouncementTO;
 import com.tcg.admin.to.FileInfoTo;
 import com.tcg.admin.to.UserInfo;
@@ -50,17 +52,21 @@ public class AnnouncementServiceImpl implements AnnouncementService {
 
     @Autowired
     private AnnouncementRepositoryCustom announcementRepositoryCustom;
-
-    @Autowired
-    private OperatorAuthenticationService operatorAuthService;
     
     @Autowired
     private IAnnouncementReadRepository readAnnouncementRepository;
     
     @Autowired
     private FileService fileService;
+    
+    @Autowired
+    private RoleMenuPermissionService roleMenuPermissionService;
+    
+    @Autowired
+    private TacCacheService tacCacheService;
 
     @Override
+    @CacheEvict(cacheNames="tac-announcement", allEntries=true)
     public Announcement saveAnnouncement(AnnouncementTO announcementTO, FileInfoTo chineseFileInfo, FileInfoTo englishFileInfo) {
         Announcement model = new Announcement();
         if(chineseFileInfo != null) {
@@ -71,14 +77,17 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         	model.setEnAttachFileName(englishFileInfo.getFileName());
             model.setEnAttachFileUrl(englishFileInfo.getFileUrl());
         }
+        
+        model.setCreateOperatorName(RequestHelper.getCurrentUser().getUser().getOperatorName());
         return save(model,announcementTO);
     }
 
     @Override
-    public Announcement updateAnnouncement(AnnouncementTO announcementTO, FileInfoTo chineseFileInfo, FileInfoTo englishFileInfo, 
+    @CacheEvict(cacheNames="tac-announcement", allEntries=true)
+    public Announcement updateAnnouncement(AnnouncementTO announcementTo, FileInfoTo chineseFileInfo, FileInfoTo englishFileInfo, 
     		Boolean deleteChineseFile, Boolean deleteEnglishFile) {
     	
-        Announcement model = announcementRepository.findByAnnouncementID(announcementTO.getAnnouncementId());
+        Announcement model = announcementRepository.findByAnnouncementID(announcementTo.getAnnouncementId());
         
         String chineseFileUrl = model.getCnAttachFileUrl();
         String englishFileUrl = model.getEnAttachFileUrl();
@@ -102,7 +111,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
             model.setEnAttachFileUrl(englishFileInfo.getFileUrl());
         }
         
-        Announcement result = save(model,announcementTO);
+        Announcement result = save(model, announcementTo);
         
         if(deleteChineseFile) {
         	fileService.deleteFromUrl(chineseFileUrl);
@@ -121,9 +130,11 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         Pageable pageable = new PageRequest(pageNo, pageSize);
         List<Announcement> newAnnouncementList = new ArrayList<>();
         Page<Announcement> data = announcementRepositoryCustom.find(startDate, endDate, summaryContent,status,pageable, announcementType,null);
-        List<Map<String,String>> merchList =  (List<Map<String,String>>)operatorAuthService.getSessionValue(RequestHelper.getToken(), SessionConstants.OPERATOR_MERCHANTS);
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
+        List<Map<String,String>> merchList =  roleMenuPermissionService.getMerchants(userInfo);
+        Set<String> merchantIdSet = getMerchantIdSet(merchList);
         for(Announcement announcement :  data.getContent()) {
-            if(canView(merchList, announcement.getMerchants())) {
+            if(canView(merchantIdSet, announcement.getMerchants())) {
                 newAnnouncementList.add(announcement);
             }
         }
@@ -131,144 +142,109 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         return  new PageImpl<>(newAnnouncementList, pageable, data.getTotalElements());
     }
 
-    private Announcement save(Announcement model,AnnouncementTO announcementTO)
-    {
-        if(model != null) {
-            model.setEnContent(announcementTO.getEnContent());
-            model.setCnContent(announcementTO.getCnContent());
-            model.setStatus(announcementTO.getStatus());
-            model.setEnSummary(announcementTO.getEnSummary());
-            model.setCnSummary(announcementTO.getCnSummary());
-            model.setFrequency(announcementTO.getFrequency());
-            model.setStartTime(DateTools.toDate(DATE_TIME_FORMAT,announcementTO.getStartTime()));
-            model.setMerchants(announcementTO.getMerchants());
-            model.setMerchantType(announcementTO.getMerchantType());
-            model.setAnnouncementType(announcementTO.getAnnouncementType());
-            model.setVendor(announcementTO.getVendor());
-            return announcementRepository.saveAndFlush(model);
+    private Announcement save(Announcement model,AnnouncementTO announcementTO) {
+        model.setEnContent(announcementTO.getEnContent());
+        model.setCnContent(announcementTO.getCnContent());
+        model.setStatus(announcementTO.getStatus());
+        model.setEnSummary(announcementTO.getEnSummary());
+        model.setCnSummary(announcementTO.getCnSummary());
+        model.setFrequency(announcementTO.getFrequency());
+        model.setStartTime(DateTools.parseDate(announcementTO.getStartTime(), DATE_TIME_FORMAT));
+        if(announcementTO.getMaintenanceStartTime() != null) {
+        	model.setMaintenanceStartTime(DateTools.parseDate(announcementTO.getMaintenanceStartTime(), DATE_TIME_FORMAT));
         }
-        return null;
+        if(announcementTO.getMaintenanceEndTime() != null) {
+        	model.setMaintenanceEndTime(DateTools.parseDate(announcementTO.getMaintenanceEndTime(), DATE_TIME_FORMAT));
+        }
+        model.setMerchants(announcementTO.getMerchants());
+        model.setMerchantType(announcementTO.getMerchantType());
+        model.setAnnouncementType(announcementTO.getAnnouncementType());
+        model.setVendor(announcementTO.getVendor());
+        model.setUpdateOperatorName(RequestHelper.getCurrentUser().getUser().getOperatorName());
+        return announcementRepository.saveAndFlush(model);
     }
 
     @Override
+    @CacheEvict(cacheNames="tac-announcement", allEntries=true)
     public void updateStatus(AnnouncementTO announcementTO) {
         Announcement model = announcementRepository.findByAnnouncementID(announcementTO.getAnnouncementId());
         model.setStatus(announcementTO.getStatus());
+        model.setUpdateOperatorName(RequestHelper.getCurrentUser().getUser().getOperatorName());
         announcementRepository.save(model);
     }
 
-
-    private boolean doesIdExist(String str_toFind, List<Map<String,String>> merchList)  {
-        for(Map<String,String> map : merchList) {
-            if(map.get("merchantId").equals(str_toFind))
-                return true;
-        }
-        return false;
-    }
-
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-	public Map<String, Object> getAvailableAnnouncement(String currentDate) throws AdminServiceBaseException {
-		Map<String, Object> map = Maps.newHashMap();
-		 List<Announcement> newAnnouncementList = new ArrayList<>();
-		Pageable pageable = new PageRequest(0, 50);
-		UserInfo<Operator> userInfo = operatorAuthService.getOperatorByToken(RequestHelper.getToken());
-		Integer operatorId = userInfo.getUser().getOperatorId();
-		Page<Announcement> data = announcementRepositoryCustom.find(null, currentDate, null,AnnouncementService.ACTIVE,pageable, AnnouncementService.ALL,null);
-		List<ReadAnnouncement> readAnn = readAnnouncementRepository.findReadAnnouncementByOperatorId(operatorId);
-		 List<Map<String,String>> merchList =  (List<Map<String,String>>)operatorAuthService.getSessionValue(RequestHelper.getToken(), SessionConstants.OPERATOR_MERCHANTS);
-		 
-		for(Announcement announcement :  data.getContent())
-        {
-            String merchants = announcement.getMerchants();
-            if(merchants != null && !merchants.trim().isEmpty()) {
-                String[] merchantIds = merchants.split(",");
-                for (String id : merchantIds) {
-                    if (doesIdExist(id, merchList)) {
-                        newAnnouncementList.add(announcement);
-                        break;
-                    }
-                }
-            }else{
-            	newAnnouncementList.add(announcement);
-            }
-        }
-		map.put("announcement", newAnnouncementList);
-		map.put("readAnnouncement", this.getReadAnnouncement(readAnn));
-		return map;
-	}
-
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public Map<String, Object> getAvailableAnnouncement2(String currentDateStr, Integer  pageNo, Integer pageSize, String status, String announcementType,String vendor) throws AdminServiceBaseException {
+    @Cacheable(cacheNames="tac-announcement", key = "'getAvailableAnnouncement:@' + #announcementType + '@' + #status + '@' + #vendor + '@' + #operatorId + '@' + #hourforDate")
+    public Map<String, Object> getAvailableAnnouncement(Integer operatorId, String status, String announcementType, String vendor, Integer hourforDate) {
         Map<String, Object> map = Maps.newHashMap();
-        boolean next = true;
-        List<Announcement> newAnnouncementList1 = new ArrayList<>();
-        List<Announcement> newAnnouncementList2 = new ArrayList<>();
-        List<Announcement> newAnnouncementList3 = new ArrayList<>();
-        UserInfo<Operator> userInfo = operatorAuthService.getOperatorByToken(RequestHelper.getToken());
-        Integer operatorId = userInfo.getUser().getOperatorId();
+        List<Announcement> resultAnnouncement = Lists.newLinkedList();
         Date currentDate = new Date();
-        Date date = DateUtils.ceiling(currentDate, Calendar.HOUR);
-        List<Announcement> data = announcementRepository.findByStartTimeGreaterThanAndStatus(date);
+        Date endTime = DateUtils.ceiling(currentDate, Calendar.HOUR);
+        Date startTime = DateUtils.addMonths(DateUtils.truncate(currentDate, Calendar.DATE), -3);
+        List<Announcement> data = announcementRepository.findByStartTimeGreaterThanAndStatusAndType(startTime, endTime, announcementType);
         List<ReadAnnouncement> readAnn = readAnnouncementRepository.findReadAnnouncementByOperatorId(operatorId);
         Set<Integer> readAnnouncement = this.getReadAnnouncement(readAnn);
-        List<Map<String,String>> merchList =  (List<Map<String,String>>)operatorAuthService.getSessionValue(RequestHelper.getToken(), SessionConstants.OPERATOR_MERCHANTS);
+        List<Map<String,String>> merchList =  roleMenuPermissionService.getMerchants(operatorId);
         //筛选当前用户所拥有mercahnt的 announcement
-        for(Announcement announcement :  data)
-        {
-            String merchants = announcement.getMerchants();
-            if(merchants != null && !merchants.trim().isEmpty()) {
-                String[] merchantIds = merchants.split(",");
-                for (String id : merchantIds) {
-                    if (doesIdExist(id, merchList)) {
-                        newAnnouncementList1.add(announcement);
-                        break;
-                    }
-                }
-            }else{
-                newAnnouncementList1.add(announcement);
-            }
-        }
+        List<Announcement> newAnnouncementList1 = filterMerchantAnnouncement(data, merchList);
+        
         //筛选符合条件的数据
         for(Announcement announcement: newAnnouncementList1){
-            if(announcement.getStartTime().after(currentDate)) {
-                continue;
+            if(announcement.getStartTime().after(currentDate) || (!("0").equals(announcementType) && !announcement.getAnnouncementType().equals(announcementType))){
+            	continue;
             }
-            
-            if(("0").equals(announcementType)|| announcement.getAnnouncementType().equals(announcementType)){
-                if(vendor==null || vendor.equals(announcement.getVendor()))
-                {
-                    if(("0").equals(status)){
-                        newAnnouncementList2.add(announcement);
-                    }else if(("1").equals(status)){
-                        if(readAnnouncement.contains(announcement.getAnnouncementId())){
-                            newAnnouncementList2.add(announcement);
-                        }
-                    }else if(("2").equals(status)){
-                        if(!readAnnouncement.contains(announcement.getAnnouncementId())){
-                            newAnnouncementList2.add(announcement);
-                        }
-                    }
-
-                }
+            if((vendor==null || vendor.equals(announcement.getVendor())) && isMatchStatusAnnocement(status, announcement, readAnnouncement)) {
+            	resultAnnouncement.add(announcement);
             }
         }
-        //筛选当前页面数据
-        if(newAnnouncementList2.size() >= pageNo* pageSize){
-            Integer max = (pageNo+1)* pageSize;
-            if(newAnnouncementList2.size()<(pageNo+1)* pageSize){
-                next = false;
-                max = newAnnouncementList2.size();
-            }
-            newAnnouncementList3 = newAnnouncementList2.subList(pageNo* pageSize,max);
-        }
 
-        map.put("announcement", newAnnouncementList3);
-        map.put("readAnnouncement", this.getReadAnnouncement(readAnn));
-        map.put("next", next);
-        map.put("pageNo", pageNo+1);
+        map.put("announcement", resultAnnouncement);
+        map.put("readAnnouncement", readAnnouncement);
+        
         return map;
     }
+
+	private List<Announcement> filterMerchantAnnouncement(List<Announcement> data,
+			List<Map<String, String>> merchList) {
+    	List<Announcement> newAnnouncementList = Lists.newLinkedList();
+    	Set<String> merchantIdSet = getMerchantIdSet(merchList);
+    	for(Announcement announcement :  data) {
+            String merchants = announcement.getMerchants();
+            if(merchants == null || merchants.trim().isEmpty()) {
+            	newAnnouncementList.add(announcement);
+            	continue;
+            }
+            String[] merchantIds = merchants.split(",");
+            for (String id : merchantIds) {
+            	if(merchantIdSet.contains(id)) {
+            		newAnnouncementList.add(announcement);
+                    break;
+            	}
+            }
+        }
+		return newAnnouncementList;
+	}
+
+	private Set<String> getMerchantIdSet(List<Map<String, String>> merchList) {
+		Set<String> merchantIds = Sets.newHashSet();
+		for(Map<String,String> map : merchList) {
+			merchantIds.add(map.get("merchantId"));
+        }
+		return merchantIds;
+	}
+
+	private boolean isMatchStatusAnnocement(String status, Announcement announcement, Set<Integer> readAnnouncement) {
+    	return "0".equals(status) || isMatchReadAnnounced(status, announcement, readAnnouncement) || isMatchUnreadAnnounced(status, announcement, readAnnouncement);
+	}
+        
+	private boolean isMatchReadAnnounced(String status, Announcement announcement, Set<Integer> readAnnouncement) {
+		return ("1").equals(status) && readAnnouncement.contains(announcement.getAnnouncementId());
+	}
 	
+	private boolean isMatchUnreadAnnounced(String status, Announcement announcement, Set<Integer> readAnnouncement) {
+		return ("2").equals(status) && !readAnnouncement.contains(announcement.getAnnouncementId());
+	}
+
 	private Set<Integer> getReadAnnouncement(List<ReadAnnouncement> readAnns){
 		
 		if(CollectionUtils.isNotEmpty(readAnns)){
@@ -282,11 +258,10 @@ public class AnnouncementServiceImpl implements AnnouncementService {
 		return Sets.newHashSet();
 	}
 	
-	public void markAsReadAnnouncementById(List<Integer> idsToRead) {
-		UserInfo<Operator> userInfo = operatorAuthService.getOperatorByToken(RequestHelper.getToken());
-		Integer operatorId = userInfo.getUser().getOperatorId();
+	@RedisCacheEvict(key = "'getUnreadActiveAnnouncementCount:' + #operatorId")
+	public void markAsReadAnnouncementById(Integer operatorId, List<Integer> idsToRead) {
 		List<ReadAnnouncement> readAnnouncements = Lists.newLinkedList();
-		
+		 
 		List<ReadAnnouncement> readAnnouncementsIds = readAnnouncementRepository.findReadAnnouncementByOperatorId(operatorId);
 		
 		Set<Integer> alreadyReadIds = getReadAnnouncement(readAnnouncementsIds);
@@ -300,25 +275,28 @@ public class AnnouncementServiceImpl implements AnnouncementService {
 				read.setAnnouncementId(readItems);
 				readAnnouncements.add(read);
 			}
+			readAnnouncementRepository.save(readAnnouncements);
+			tacCacheService.evictCacheForReadAnnouncement(operatorId, idsToRead.get(0));
 		}
 		
-		readAnnouncementRepository.save(readAnnouncements);
 	}
 
     @Override
+    @Cacheable(cacheNames="tac-announcement", key = "'getUnreadActiveAnnouncementCount:' + #operatorId")
     public Map<String, Integer> getUnreadActiveAnnouncementCount(Integer operatorId) {
         Map<String, Integer> resuleMap = Maps.newHashMap();
         
         Date currentDate = new Date();
-        Date date = DateUtils.ceiling(currentDate, Calendar.HOUR);
-        List<Announcement> data = announcementRepository.findByStartTimeGreaterThanAndStatus(date);
+        Date endTime = DateUtils.ceiling(currentDate, Calendar.HOUR);
+        Date startTime = DateUtils.addMonths(DateUtils.truncate(currentDate, Calendar.DATE), -3);
+        List<Announcement> data = announcementRepository.findByStartTimeGreaterThanAndStatus(startTime, endTime);
         List<ReadAnnouncement> readAnn = readAnnouncementRepository.findReadAnnouncementByOperatorId(operatorId);
         Set<Integer> readAnnouncement = this.getReadAnnouncement(readAnn);
-        List<Map<String,String>> merchList =  (List<Map<String,String>>)operatorAuthService.getSessionValue(RequestHelper.getToken(), SessionConstants.OPERATOR_MERCHANTS);
-        
+        List<Map<String,String>> merchList =  roleMenuPermissionService.getMerchants(operatorId);
+        Set<String> merchantIdSet = getMerchantIdSet(merchList);
         for(Announcement announcement :  data) {
             String merchants = announcement.getMerchants();
-            if(isUnreadAnnouncement(announcement, readAnnouncement, merchList, merchants)) {
+            if(isUnreadAnnouncement(announcement, readAnnouncement, merchantIdSet, merchants)) {
                 int typeCount = resuleMap.get(announcement.getAnnouncementType()) == null ? 0 : resuleMap.get(announcement.getAnnouncementType());
                 resuleMap.put(announcement.getAnnouncementType(), typeCount + 1);
             }
@@ -327,11 +305,11 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         return resuleMap;
     }
 
-    private boolean isUnreadAnnouncement(Announcement announcement, Set<Integer> readAnnouncement, List<Map<String, String>> merchList, String merchants) {
+    private boolean isUnreadAnnouncement(Announcement announcement, Set<Integer> readAnnouncement, Set<String> merchantIdSet, String merchants) {
         if(merchants != null && !merchants.trim().isEmpty()) {
             String[] merchantIds = merchants.split(",");
             for (String id : merchantIds) {
-                if (doesIdExist(id, merchList) && !readAnnouncement.contains(announcement.getAnnouncementId()) ) {
+                if (merchantIdSet.contains(id) && !readAnnouncement.contains(announcement.getAnnouncementId()) ) {
                     return true;
                 }
             }
@@ -349,11 +327,12 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         
         List<Integer> resultList = Lists.newLinkedList();
         
-        List<Map<String,String>> merchList =  (List<Map<String,String>>)operatorAuthService.getSessionValue(RequestHelper.getToken(), SessionConstants.OPERATOR_MERCHANTS);
-        
+        UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
+        List<Map<String,String>> merchList = roleMenuPermissionService.getMerchants(userInfo);
+        Set<String> merchantIdSet = getMerchantIdSet(merchList);
         for(Announcement announcement : announcements) {
             String merchants = announcement.getMerchants();
-            if(canView(merchList, merchants)) {
+            if(canView(merchantIdSet, merchants)) {
                 resultList.add(announcement.getAnnouncementId());
             }
         }
@@ -361,11 +340,11 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         return resultList;
     }
 
-    private boolean canView(List<Map<String, String>> merchList, String merchants) {
+    private boolean canView(Set<String> merchantIdSet, String merchants) {
         if(merchants != null && !merchants.trim().isEmpty()) {
             String[] merchantIds = merchants.split(",");
             for (String id : merchantIds) {
-                if (doesIdExist(id, merchList)) {
+                if (merchantIdSet.contains(id)) {
                     return true;
                 }
             }

@@ -4,6 +4,7 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
@@ -18,7 +19,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.google.common.collect.Lists;
-import com.tcg.admin.common.constants.IErrorCode;
 import com.tcg.admin.common.error.AdminErrorCode;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.common.helper.RequestHelper;
@@ -72,41 +72,34 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public Page<MenuCategory> queryMenuCategory(MenuCategoryTO to) throws AdminServiceBaseException {
+    public Page<MenuCategory> queryMenuCategory(MenuCategoryTO to) {
         return menuCategoryRepo.queryMenuCategory(to , new PageRequest(to.getPageNo(), to.getPageSize()));
     }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
-    public List<MenuCategoryMenu> deleteMenuCategory(MenuCategoryTO to) throws AdminServiceBaseException {
-        MenuCategory menuCategory = menuCategoryRepository.findOne(to.getCategoryName());
+    public List<MenuCategoryMenu> deleteMenuCategory(MenuCategoryTO to) {
+        MenuCategory menuCategory = menuCategoryRepository.findMenuCategoryByMenuCategoryName(to.getCategoryName());
         if(menuCategory != null) {
             menuCategoryRepository.delete(menuCategory);
 
             /**
              *  transfer (other menuCategory to SYSTEM)
              */
-            List<Integer> list = menuCategoryMenuRepository.findByMenuCategoryName(to.getCategoryName());
+//            List<Integer> list = menuCategoryMenuRepository.findByMenuCategoryName(to.getCategoryName());
+            //节点被选后不在SYSTEM中
+//            Set<Integer> existList = menuCategoryMenuRepository.selectMenuByCategoryNameAndMenuIds("SYSTEM",list);
 
-            List<Integer> existList = menuCategoryMenuRepository.selectMenuByCategoryNameAndMenuIds("SYSTEM",list);
+            List<MenuCategoryMenu> saveModelList = Lists.newLinkedList();
+            
+            menuCategoryMenuRepository.deleteMenuCategoryName(to.getCategoryName());
 
-            List<MenuCategoryMenu> saveModelList = new ArrayList<>();
-            if(CollectionUtils.isNotEmpty(list)){
-                for(Integer i: list){
-                    if(!existList.contains(i)){
-                        MenuCategoryMenu menuCategoryMenu = new MenuCategoryMenu();
-                        menuCategoryMenu.setMenuCategoryName("SYSTEM");
-                        menuCategoryMenu.setMenuId(i);
-                        saveModelList.add(menuCategoryMenu);
-                    }
-                }
-                menuCategoryMenuRepository.deleteMenuCategoryName(to.getCategoryName());
-            }
-
+            //品牌关联的权限群组删除
             List<MerchantMenuCategory> deleteList =  merchantMenuCategoryRepository.findMerchantMenuCategoryByMenuCategoryName(to.getCategoryName());
-            if(CollectionUtils.isNotEmpty(deleteList)){
-                merchantMenuCategoryRepository.delete(deleteList);
-            }
+            merchantMenuCategoryRepository.delete(deleteList);
+
+            genAndSaveSystemMenuList();
+
             return saveModelList;
         }else{
             throw new AdminServiceBaseException(AdminErrorCode.MENU_CATEGORY_NOT_EXIST_ERROR, "Menu Category Not Exist Error");
@@ -115,13 +108,13 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
 
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
-    public void saveMenuCategoryMenu(List<MenuCategoryMenu> list) throws AdminServiceBaseException {
+    public void saveMenuCategoryMenu(List<MenuCategoryMenu> list) {
         menuCategoryMenuRepository.save(list);
     }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
-    public void correlatePermission(MenuCategoryTO to) throws AdminServiceBaseException {
+    public void correlatePermission(MenuCategoryTO to) {
         try {
             // 1.每個menuId都要存在__________________________________________________________________
             for (Integer menuId : to.getMenuIdList()) {
@@ -130,20 +123,22 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
                     throw new AdminServiceBaseException(AdminErrorCode.MENU_NOT_EXIST_ERROR, "Can't Find The Corresponding Menu");
                 }
             }
-            //2.检查menuId（isButton=1）是否已存在___________________________________________________________________________
-            List<Integer> menuIds =menuCategoryMenuRepository.queryByMenuId();
-            for(Integer menuId: to.getMenuIdList()){
-                if(menuIds.contains(menuId))
-                {
-                    throw new AdminServiceBaseException(AdminErrorCode.MENU_CATEGORY_MENU_ALREADY_EXIST, "Permission Already Exist");
-                }
-            }
+            //2.检查menuId（isButton=1）是否已存在_____________拿掉??(权限是可以被多个权限群组所拥有)______________________________________________________________
+//            List<Integer> menuIds =menuCategoryMenuRepository.queryByMenuId();
+//            for(Integer menuId: to.getMenuIdList()){
+//                if(menuIds.contains(menuId))
+//                {
+//                    throw new AdminServiceBaseException(AdminErrorCode.MENU_CATEGORY_MENU_ALREADY_EXIST, "Permission Already Exist");
+//                }
+//            }
             //3.创建menu_category___________________________________________________________________________
-            MenuCategory category = menuCategoryRepository.findOne(to.getCategoryName());
+            MenuCategory category = menuCategoryRepository.findMenuCategoryByMenuCategoryName(to.getCategoryName());
+
             MenuCategory categoryAfterSave;
+
             MenuCategory categoryNew = new MenuCategory();
             if(category==null) {
-                UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+                UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
                 String  operatorName = userInfo.getUser().getOperatorName();
                 categoryNew.setCategoryName(to.getCategoryName().toUpperCase());
                 categoryNew.setCreateOperator(operatorName);
@@ -154,7 +149,7 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
 
             // 4.關聯關係___________________________________________________________________________
             String menuCategoryName = categoryAfterSave.getCategoryName();
-            List<MenuCategoryMenu> menuCategoryMenus = new ArrayList<MenuCategoryMenu>();
+            List<MenuCategoryMenu> menuCategoryMenus = Lists.newLinkedList();
             for (Integer menu : to.getMenuIdList()) {
                 MenuCategoryMenu menuCategoryMenu = new MenuCategoryMenu();
                 menuCategoryMenu.setMenuCategoryName(menuCategoryName);
@@ -164,11 +159,16 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
 
             menuCategoryMenuRepository.save(menuCategoryMenus);
 
-            List<Integer> deleteList = this.maintainSystem(to.getMenuIdList());
+            //?? 拿掉，无论是否节点,如果存在在SYSTEM中都删除
+//            List<Integer> deleteList = this.maintainSystem(to.getMenuIdList());
+            List<Integer> deleteList = to.getMenuIdList();
+
             if(CollectionUtils.isNotEmpty(deleteList)){
                 menuCategoryMenuRepository.deleteMenuByCategoryNameAndMenuIds("SYSTEM", deleteList);
             }
 
+
+            //将新添加的权限群组添加到每一个品牌中
             List<Merchant> merchantList = merchantRepository.findAllmerchantExceptCompany();
             List<MerchantMenuCategory> list = new ArrayList<>();
             for (Merchant merchant : merchantList) {
@@ -183,7 +183,7 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
         } catch (AdminServiceBaseException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_EXCEPTION, ex.getMessage(), ex);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
         }
     }
 
@@ -194,8 +194,7 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
      */
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
-    public List<MenuCategoryMenu> reCorrelatePermission(MenuCategoryTO to) throws AdminServiceBaseException {
-//        try {
+    public List<MenuCategoryMenu> reCorrelatePermission(MenuCategoryTO to) {
             // 1.每個menuId都要存在__________________________________________________________________
             for (Integer menuId : to.getMenuIdList()) {
                 MenuItem menu = menuCacher.getMenuMap().get(menuId);
@@ -204,14 +203,14 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
                 }
             }
             //3.创建menu_category___________________________________________________________________________
-            MenuCategory category = menuCategoryRepository.findOne(to.getCategoryName());
+            MenuCategory category = menuCategoryRepository.findMenuCategoryByMenuCategoryName(to.getCategoryName());
 
             if(category == null)
             {
                 throw new AdminServiceBaseException(AdminErrorCode.MENU_CATEGORY_NOT_EXIST_ERROR, "Menu Category Not Exist Error");
             }
 
-            UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(RequestHelper.getToken());
+            UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
             String  operatorName = userInfo.getUser().getOperatorName();
             category.setUpdateOperator(operatorName);
             menuCategoryRepository.save(category);
@@ -231,13 +230,6 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
             List<Integer> tarGetList = new ArrayList<>();
             tarGetList.addAll(uiList);
 
-            //for save system
-            List<Integer> systemList = new ArrayList<>();
-            systemList.addAll(this.maintainSystem(dbList));
-
-            //for delete system
-            List<Integer> deleteList = this.maintainSystem(tarGetList);
-
             List<MenuCategoryMenu> saveModelList = new ArrayList<>();
             for(Integer i: tarGetList){
                 MenuCategoryMenu menuCategoryMenu = new MenuCategoryMenu();
@@ -245,25 +237,21 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
                 menuCategoryMenu.setMenuId(i);
                 saveModelList.add(menuCategoryMenu);
             }
-            for(Integer i: systemList){
-                MenuCategoryMenu menuCategoryMenu = new MenuCategoryMenu();
-                menuCategoryMenu.setMenuCategoryName("SYSTEM");
-                menuCategoryMenu.setMenuId(i);
-                saveModelList.add(menuCategoryMenu);
-            }
-
             if(CollectionUtils.isNotEmpty(dbList)){
-                menuCategoryMenuRepository.deleteMenuByCategoryNameAndMenuIds(menuCategoryName, dbList);
+                menuCategoryMenuRepository.deleteMenuByCategoryName(menuCategoryName);
             }
-
-            if(CollectionUtils.isNotEmpty(deleteList)){
-                menuCategoryMenuRepository.deleteMenuByCategoryNameAndMenuIds("SYSTEM", deleteList);
+            if(CollectionUtils.isNotEmpty(tarGetList)){
+                menuCategoryMenuRepository.deleteMenuByCategoryNameAndMenuIds("SYSTEM", tarGetList);
             }
 
         return saveModelList;
     }
 
-
+    @Override
+    public void reCorrelateRefresh(List<MenuCategoryMenu> menuCategoryMenus) {
+        saveMenuCategoryMenu(menuCategoryMenus);
+        genAndSaveSystemMenuList();
+    }
 
     private List<Integer> maintainSystem(List<Integer> saveList){
         List<Integer> systemDelete = new ArrayList<>();
@@ -285,15 +273,16 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
         List<MenuCategoryMenu> saveModelList = Lists.newLinkedList();
         
         // 从四月一号开始的新功能
-        Date startDate = null;
-        try {
-            startDate = DateUtils.parseDate("2018-04-01", "yyyy-MM-dd");
-        } catch (ParseException e) {
-            LOGGER.error("parser date error", e);
-        }
+//        Date startDate = null;
+//        try {
+//            startDate = DateUtils.parseDate("2018-04-01", "yyyy-MM-dd");
+//        } catch (ParseException e) {
+//            LOGGER.error("parser date error", e);
+//        }
         
         List<Integer> existMenuIds = menuCategoryMenuRepository.findMenuIdDistinct();
-        List<Integer> allButtonMenuIds = menuItemRepository.findNewMenuIdByIsLeaf(1, startDate);
+        //获取menu_item表中所有item和menu_Category_menu对比,刷新
+        List<Integer> allButtonMenuIds = menuItemRepository.findButtons();
         
         // 删除存在的 menuId
         allButtonMenuIds.removeAll(existMenuIds);
@@ -305,13 +294,30 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
             saveModelList.add(menuCategoryMenu);
         }
         saveMenuCategoryMenu(saveModelList);
-        LOGGER.info("generate and save system category menu id: " + StringUtils.join(allButtonMenuIds, ","));
+        
+//        List<Integer> allNotButtonMenuIds = menuItemRepository.findButtonNewMenuId(startDate, 0);
+//        List<Integer> allSystemMenuId = menuCategoryMenuRepository.findByMenuCategoryName("SYSTEM");
+//
+//        allNotButtonMenuIds.removeAll(allSystemMenuId);
+//
+//        saveModelList = Lists.newLinkedList();
+//
+//        for(Integer menuId : allNotButtonMenuIds){
+//            MenuCategoryMenu menuCategoryMenu = new MenuCategoryMenu();
+//            menuCategoryMenu.setMenuCategoryName("SYSTEM");
+//            menuCategoryMenu.setMenuId(menuId);
+//            saveModelList.add(menuCategoryMenu);
+//        }
+//        saveMenuCategoryMenu(saveModelList);
+//
+        
+        LOGGER.info("generate and save system category menu id: {}", StringUtils.join(allButtonMenuIds, ","));
         return saveModelList;
     }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
-    public List<MenuItem> queryMenuItemsByCategory(String categoryName) throws AdminServiceBaseException {
+    public List<MenuItem> queryMenuItemsByCategory(String categoryName) {
         try {
             List<Integer> menuIdList;
             if (StringUtils.isNotBlank(categoryName)){
@@ -319,7 +325,7 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
             }else{
                 menuIdList = menuCategoryMenuRepository.queryByMenuCategoryMenu();
             }
-            List<MenuItem> menuItemList = new ArrayList<MenuItem>();
+            List<MenuItem> menuItemList = Lists.newLinkedList();
             for (Integer menuId : menuIdList) {
                 MenuItem menu = menuCacher.getMenuMap().get(menuId);
                 if ( menu != null){
@@ -328,12 +334,12 @@ public class MenuCategoryServiceImpl implements MenuCategoryService {
             }
             return menuItemList;
         } catch (Exception ex) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, ex.getMessage(), ex);
         }
     }
 
     @Override
-    public List<Merchant> queryAllMerchantByCategoryName(String menuCategoryName) throws AdminServiceBaseException {
+    public List<Merchant> queryAllMerchantByCategoryName(String menuCategoryName) {
         return merchantRepository.findMenuCategoryByMenuCategoryName(menuCategoryName);
     }
 }

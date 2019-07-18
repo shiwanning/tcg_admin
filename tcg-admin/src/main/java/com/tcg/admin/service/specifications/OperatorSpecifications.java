@@ -51,6 +51,12 @@ public class OperatorSpecifications {
                     Predicate pred = cb.equal(namePath, queryOperatorTO.getActiveFlag());
                     predicatesList.add(pred);
                 }
+                if (queryOperatorTO.getNotIncludeActiveFlag()!= null){
+                    Path<Integer> namePath = root.get("activeFlag");
+                    Predicate pred = cb.notEqual(namePath, queryOperatorTO.getNotIncludeActiveFlag());
+                    predicatesList.add(pred);
+                }
+
 
                 query.where(predicatesList.toArray(new Predicate[predicatesList.size()]));
                 return query.getGroupRestriction();

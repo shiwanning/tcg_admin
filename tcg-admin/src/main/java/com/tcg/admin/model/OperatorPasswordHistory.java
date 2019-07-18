@@ -46,6 +46,12 @@ public class OperatorPasswordHistory extends BaseEntity {
     @Column(name = "PASSWORD")
     private String password;
 
+    /**
+     * 變更後的密碼
+     */
+    @Column(name = "IS_RESET")
+    private Integer isReset;
+
 
     public String getPassword() {
         return password;
@@ -72,4 +78,11 @@ public class OperatorPasswordHistory extends BaseEntity {
         this.seqId = seqId;
     }
 
+    public Integer getIsReset() {
+        return isReset;
+    }
+
+    public void setIsReset(Integer isReset) {
+        this.isReset = isReset;
+    }
 }

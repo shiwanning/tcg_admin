@@ -44,6 +44,19 @@ public interface IMerchantOperatorRepository extends JpaRepository<MerchantOpera
     @Query("delete from MerchantOperator mercOp where mercOp.operatorId = ?1")
     void deleteByOperatorId(Integer operatorId);
 
+
+
+    /**
+     * 依 merchantCode 刪除隸屬部門的 record
+     *
+     * @param merchantCode
+     */
+    @Modifying()
+    @Query(value = "delete from US_MERCHANT_OPERATOR mercOp " +
+            " where mercOp.MERCHANT_ID in (select merchant_id from ADMIN_MERCHANT where MERCHANT_CODE = ?1) ",
+            nativeQuery = true)
+    void deleteByMerchantCode(String merchantCode);
+
     /**
      * 取得某個operator屬於哪些department
      *
@@ -86,5 +99,16 @@ public interface IMerchantOperatorRepository extends JpaRepository<MerchantOpera
 
     @Query("select merc from Merchant merc, MerchantOperator mercOp where 1=1 and merc.merchantId = mercOp.merchantId and mercOp.operatorId = ?1")
     List<Merchant> findMerchants(Integer operatorId);
+    
+    @Query("select mercOp from MerchantOperator mercOp, Merchant mt "
+    		+ " where "
+    		+ " mt.merchantId = mercOp.merchantId"
+    		+ " and mt.merchantCode = (?1)")
+    List<MerchantOperator> findByMerchantCode(String merchantCode);
+
+	MerchantOperator findByMerchantIdAndOperatorId(Integer merchantId, Integer operatorId);
+
+
+
 
 }

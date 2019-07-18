@@ -22,4 +22,7 @@ public interface ICategoryRepository extends JpaRepository<Category, Integer> {
     @Query("SELECT a FROM Category a, CategoryRole b, Role r where 1=1 and a.categoryId = b.categoryId and r.roleId = b.roleId and b.roleId in ?1 and r.activeFlag = ?2 ")
     List<Category> queryCategoryAndRoles(List<Integer> categoryId, Integer activeFlag);
 
+
+    @Query("SELECT a FROM Category a where 1=1 order by a.categoryName")
+    List<Category> findAllOrderByCatregoryName();
 }

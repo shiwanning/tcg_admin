@@ -1,15 +1,17 @@
 package com.tcg.admin.service.impl;
 
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.google.common.collect.Maps;
+import com.tcg.admin.cache.RedisCacheable;
 import com.tcg.admin.model.ApiLabel;
 import com.tcg.admin.model.MenuItem;
 import com.tcg.admin.model.Task;
@@ -61,7 +63,7 @@ public class MenuItemServiceImpl implements MenuItemService {
     }
 
 	@Override
-	@Cacheable(value="cache-ap-admin", key="'translateMenu'")
+	@RedisCacheable(key="'translateMenu'")
 	public ApiLabelTo getAllApiLabelTo() {
 		List<ApiLabel> all = apiLabelRepository.findAll();
 		ApiLabelTo result = new ApiLabelTo();
@@ -74,6 +76,17 @@ public class MenuItemServiceImpl implements MenuItemService {
 			}
 		}
 		
+		return result;
+	}
+
+	@Override
+	public Map<String, ApiLabel> getApiLabel(Integer menuId) {
+		Map<String, ApiLabel> result = Maps.newHashMap();
+		List<ApiLabel> labels = apiLabelRepository.findById(menuId);
+		
+		for(ApiLabel label : labels) {
+			result.put(label.getLanguageCode(), label);
+		}
 		return result;
 	}
 

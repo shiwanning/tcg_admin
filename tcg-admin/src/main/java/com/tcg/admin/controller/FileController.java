@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,5 +36,17 @@ public class FileController {
 		
 		return result;
 	}
+	
+	@PostMapping(value = "upload/{module}", consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
+	public JsonResponseT<FileInfoTo> createFile(@RequestParam("file") MultipartFile file, @PathVariable("module") String module) throws IOException {
+		LOGGER.info("prepare to upload {} on module {}", file.getName(), module);
+		FileInfoTo info = fileService.uploadFile(file, module);
+		
+		JsonResponseT<FileInfoTo> result = new JsonResponseT<>(true);
+		result.setValue(info);
+		
+		return result;
+	}
+
 
 }

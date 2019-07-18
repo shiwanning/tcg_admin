@@ -1,18 +1,17 @@
 package com.tcg.admin.service.impl;
 
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
+import com.tcg.admin.persistence.springdata.*;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,9 +20,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
-import com.tcg.admin.common.constants.IErrorCode;
 import com.tcg.admin.common.constants.RoleIdConstant;
-import com.tcg.admin.common.constants.TaskStatus;
+import com.tcg.admin.common.constants.TaskConstant;
 import com.tcg.admin.common.error.AdminErrorCode;
 import com.tcg.admin.common.exception.AdminServiceBaseException;
 import com.tcg.admin.common.helper.RequestHelper;
@@ -36,27 +34,16 @@ import com.tcg.admin.model.Task;
 import com.tcg.admin.model.TaskType;
 import com.tcg.admin.model.Transaction;
 import com.tcg.admin.persistence.TaskRepositoryCustom;
-import com.tcg.admin.persistence.springdata.IMenuItemRepository;
-import com.tcg.admin.persistence.springdata.IMerchantOperatorRepository;
-import com.tcg.admin.persistence.springdata.IMerchantRepository;
-import com.tcg.admin.persistence.springdata.IRoleOperatorRepository;
-import com.tcg.admin.persistence.springdata.IStateLabelType;
-import com.tcg.admin.persistence.springdata.ISystemHelperTempRepository;
-import com.tcg.admin.persistence.springdata.ITaskRepository;
-import com.tcg.admin.service.OperatorAuthenticationService;
 import com.tcg.admin.service.RoleMenuPermissionService;
 import com.tcg.admin.service.StateService;
 import com.tcg.admin.service.TaskService;
 import com.tcg.admin.service.TransactionService;
 import com.tcg.admin.service.WorkFlowService;
 import com.tcg.admin.to.TaskTO;
+import com.tcg.admin.to.UpdateTaskResult;
 import com.tcg.admin.to.UserInfo;
 import com.tcg.admin.utils.BaseUrlUtils;
 import com.tcg.admin.utils.StringTools;
-
-import net.sf.ehcache.Cache;
-import net.sf.ehcache.CacheManager;
-import net.sf.ehcache.Element;
 
 @Service
 @Transactional
@@ -78,9 +65,6 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 
 	@Autowired
     private IMerchantOperatorRepository merchantOperatorRepository;
-    
-	@Autowired
-    private OperatorAuthenticationService operatorAuthService;
 
 	@Autowired
 	private TaskService taskService;
@@ -102,7 +86,12 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 
 	@Autowired
 	private StateService stateService;
+	
+	@Autowired
+	private CacheManager redisCacheManager;
 
+	@Autowired
+	private IOperatorRepository operatorRepository;
 	/**
 	 * @description : Get all available task for operator
 	 * @param userInfo : user information who made the request
@@ -161,16 +150,19 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 	 * @return : A URI String of the state
 	 * */
 	@Override
-	public String undertakeTask(UserInfo<Operator> userInfo, Integer taskId){
+	public UpdateTaskResult undertakeTask(UserInfo<Operator> userInfo, Integer taskId){
 
+		UpdateTaskResult result = new UpdateTaskResult();
+		
 		/*Get the selected task to claim*/
 		Task task = taskService.getTask(taskId);
+		Integer operatorId = userInfo.getUser().getOperatorId();
 		
-		if(task.getStatus().equalsIgnoreCase(TaskStatus.CLOSED_STATUS)){
+		if(task.getStatus().equalsIgnoreCase(TaskConstant.CLOSED_STATUS)){
 			throw new AdminServiceBaseException(AdminErrorCode.WORKFLOW_TASK_ALREADY_CLOSE, "Task already close");
 		}
 		
-		if(!task.getOwner().equals(Integer.valueOf(0)) && !task.getOwner().equals(userInfo.getUser().getOperatorId()) && task.getStatus().equalsIgnoreCase(TaskStatus.PROCESSING_STATUS) ){
+		if(!task.getOwner().equals(Integer.valueOf(0)) && !task.getOwner().equals(operatorId) && task.getStatus().equalsIgnoreCase(TaskConstant.PROCESSING_STATUS) ){
 			throw new AdminServiceBaseException(AdminErrorCode.WORKFLOW_IN_PROCESS, "Task already being processed");
 		}
 		
@@ -191,16 +183,21 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 		}
 		
 		if(hasPermissions){
-			Integer operatorId = userInfo.getUser().getOperatorId();
-            String operatorName = userInfo.getUser().getOperatorName();
 			
-			/*update the Task in database*/
-			task.setStatus(TaskStatus.PROCESSING_STATUS);
-			//Push into states
-			this.generateAndSaveTask(task, operatorId, operatorName);
+			String operatorName = userInfo.getUser().getOperatorName();
+			// 同一个用户重复锁任务
+			if(task.getOwner().equals(operatorId) && TaskConstant.PROCESSING_STATUS.equals(task.getStatus())) {
+				result.setIsUpdate(false);
+			} else {
+				/*update the Task in database*/
+				task.setStatus(TaskConstant.PROCESSING_STATUS);
+				
+				//Push into states
+				this.generateAndSaveTask(task, operatorId, operatorName);
 
-			/*insert in transaction*/
-			this.generateAndSaveTransaction(task, operatorId,TransactionService.CLAIM_STATUS, null, operatorName);
+				/*insert in transaction*/
+				this.generateAndSaveTransaction(task, operatorId, TaskConstant.TRA_CLAIM_STATUS, null, operatorName);
+			}
 			
 			/*search the menu URL*/
 			String uri = menuItemRepository.findOne(task.getState().getMenuId()).getUrl();
@@ -210,7 +207,9 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 			map.put("subSystemTask", task.getSubSystemTask());
 			
 			/*combine the URI and the parameters*/
-			return BaseUrlUtils.buildURL(uri, map);
+			result.setUrl(BaseUrlUtils.buildURL(uri, map));
+			
+			return result;
 		}else {
 		    LOGGER.error("Operator has no permission yet, taskId: " + task.getTaskId() + 
 		        ", operator: " + userInfo.getUser().getOperatorName());
@@ -239,19 +238,39 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 		
         String operatorName = userInfo.getUser().getOperatorName();
 			/*update the Task in database*/
-		if(!task.getStatus().equals(TaskStatus.CLOSED_STATUS)){
-			task.setStatus(TaskStatus.OPEN_STATUS);
+		if(!task.getStatus().equals(TaskConstant.CLOSED_STATUS)){
+			task.setStatus(TaskConstant.OPEN_STATUS);
 		}
 		task.setUpdateTime(new Date());
 		this.generateAndSaveTask(task, 0, operatorName);
 		
 		/*insert in transaction*/
-		this.generateAndSaveTransaction(task, 0,TransactionService.UNCLAIM_STATUS, null, operatorName);
+		this.generateAndSaveTransaction(task, 0,TaskConstant.TRA_UNCLAIM_STATUS, null, operatorName);
 
 	}
-	
-	
-	
+
+
+	@Override
+	public Map<String, Object> supportMcsTaskInfo(Integer taskId) {
+
+		String taskOwner = null;
+		Date updateTime = null;
+		Map<String, Object> resultMap = new HashMap<>();
+		Task task = taskService.getTask(taskId);
+		if(task != null){
+			Operator operator = operatorRepository.findByOperatorId(task.getOwner());
+			if(operator != null){
+				taskOwner = operator.getOperatorName();
+			}
+			updateTime = task.getUpdateTime();
+
+		}
+		resultMap.put("taskOwner", taskOwner);
+		resultMap.put("claimedDate", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format (updateTime));
+
+		return  resultMap;
+	}
+
 	/**
 	 * @description : counterclaim the task of other operator
 	 * @param userInfo : user information who made the request
@@ -268,14 +287,14 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 		
 			String operatorName = userInfo.getUser().getOperatorName();
 			/*update the Task in database*/
-			if(!task.getStatus().equals(CLOSED_STATUS)){
-				task.setStatus(OPEN_STATUS);
+			if(!task.getStatus().equals(TaskConstant.CLOSED_STATUS)){
+				task.setStatus(TaskConstant.OPEN_STATUS);
 			}
 
 			task.setUpdateTime(new Date());
 			this.generateAndSaveTask(task, 0, operatorName);
 			/*insert in transaction*/
-			this.generateAndSaveTransaction(task, 0,TransactionService.UNCLAIM_STATUS, null, operatorName);
+			this.generateAndSaveTransaction(task, 0, TaskConstant.TRA_UNCLAIM_STATUS, null, operatorName);
 
 	}
 	
@@ -293,7 +312,7 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 	private void generateAndSaveTransaction(Task task, Integer operatorId, String transactionType, String reason, String updater){
 
 		/* status: P and C , record owner Name and open Time */
-		String ownerName = StringUtils.equals(task.getStatus(),OPEN_STATUS) ? null: updater ;
+		String ownerName = StringUtils.equals(task.getStatus(), TaskConstant.OPEN_STATUS) ? null: updater ;
 
 		Transaction transaction = new Transaction();
 		transaction.setTaskId(task.getTaskId());
@@ -331,19 +350,19 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 
 		/* status: P and C , record owner Name and open Time */
 		switch(task.getStatus()) {
-			case PROCESSING_STATUS:
+			case TaskConstant.PROCESSING_STATUS:
 				task.setOwnerName(updater);
 				task.setOpenTime(new Date());
 				task.setCloseTime(null);
 				break;
-			case OPEN_STATUS:
+			case TaskConstant.OPEN_STATUS:
 				task.setOwnerName(null);
 				task.setOpenTime(null);
 				task.setCloseTime(null);
 				break;
-			case CLOSED_STATUS:
+			case TaskConstant.CLOSED_STATUS:
 				task.setCloseTime(new Date());
-				task.setOwner(NO_OWNER);
+				task.setOwner(TaskConstant.NO_OWNER);
 				task.setOwnerName(null);
 				break;
 			default:
@@ -364,51 +383,35 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 	
 	@Override
 	@Transactional(propagation = Propagation.REQUIRED)
-	public Task createTask(TaskTO taskTO) {
-        if(taskTO.getStateId() == null) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, "State is null");
+	public Task createTask(TaskTO taskTo) {
+        if(taskTo.getStateId() == null) {
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, "State is null");
         }
-
-        if(inCacheAndPut(taskTO)) {
-            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, "duplicate task");
+        LOGGER.info("createTask taskTo: stateId=" + taskTo.getStateId() + ", subsystemTaskId: " + taskTo.getSubsysTaskId());
+        if(inCacheAndPut(taskTo)) {
+        	LOGGER.warn("duplicate taskTo: stateId=" + taskTo.getStateId() + ", subsystemTaskId: " + taskTo.getSubsysTaskId());
+            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, "duplicate task");
         }
         
 		Merchant merchant = null;
 
-		if(StringUtils.isNotEmpty(taskTO.getMerchantCode())){
-			merchant = merchantRepository.findByMerchantCode(taskTO.getMerchantCode());
+		if(StringUtils.isNotEmpty(taskTo.getMerchantCode())){
+			merchant = merchantRepository.findByMerchantCode(taskTo.getMerchantCode());
 		}
 		
-		Task task = taskService.getSubsysTask(taskTO.getSubsysTaskId(), taskTO.getStateId(), CLOSED_TASK);
+		Task task = taskService.getSubsysTask(taskTo.getSubsysTaskId(), taskTo.getStateId(), TaskConstant.CLOSED_STATUS);
         if(task != null) {
            return task;
         }else{
-            task = new Task();
-    		task.setDescription(taskTO.getTaskDescription());
-    		task.setMerchantId(merchant != null ? merchant.getMerchantId() : null);
-    		task.setState(stateService.getState(taskTO.getStateId()));
-    		task.setSubSystemTask(taskTO.getSubsysTaskId());
-    		task.setUpdateTime(null);
-		if (StringTools.isEmptyOrNull(taskTO.getOperatorName())) {
-			task.setCreateOperator(SYSTEM_OPERATOR);
-		} else {
-			task.setCreateOperator(taskTO.getOperatorName());
-		}
-			task.setOwner(NO_OWNER);
-			task.setStatus(OPEN_STATUS);
-    		task = taskService.saveAndMerge(task);
-    		generateAndSaveTransaction(task, NO_OWNER, TransactionService.CREATE_STATUS, "", SYSTEM_OPERATOR);
-		
+            return saveTaskTo(taskTo, merchant);
         }
-
-		return task;
 	}
 
     private boolean inCacheAndPut(TaskTO taskTo) {
         try {
-            Cache cache = CacheManager.getCacheManager("cache-ap-admin").getCache("task-create");
-            boolean inCache = cache.get(taskTo.getTaskId() + "-" + taskTo.getSubsysTaskId()) != null;
-            cache.put(new Element(taskTo.getTaskId() + "-" + taskTo.getSubsysTaskId(), taskTo));
+            Cache cache = redisCacheManager.getCache("tac-task-create");
+            boolean inCache = cache.get("createTask:" + taskTo.getStateId() + "-" + taskTo.getSubsysTaskId()) != null;
+            cache.put("createTask:" + taskTo.getStateId() + "-" + taskTo.getSubsysTaskId(), taskTo);
             return inCache;
         } catch(Exception e) {
             LOGGER.warn("cacheException", e);
@@ -421,36 +424,55 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 		Task actualTask = taskService.getTask(task.getTaskId());
 		
 		State state = stateService.getState(task.getStateId());
-		if (state == null) {
-			throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, "State Not Found");
+		if(state == null) {
+			throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, "State Not Found");
+		} else {
+			List<StateRelationship> nextStates = stateService.getStateRelationship(actualTask.getStateId(),task.getStateId());
+			if(CollectionUtils.isEmpty(nextStates)){
+				throw new AdminServiceBaseException(AdminErrorCode.NEXT_STATE_ID_NOT_CORRECT, "The next state id not correct");
+			}
+			actualTask.setState(stateService.getState(task.getStateId()));
 		}
+		
 		if(!actualTask.getOwner().equals(operatorInfo.getUser().getOperatorId())){
 			throw new AdminServiceBaseException(AdminErrorCode.WORKFLOW_LOCKED_BY_OTHER_USER, "Task being processed by another user");
 		}
 		
-		actualTask.setState(state);
-		actualTask.setStatus(OPEN_STATUS);
-		actualTask.setOwner(NO_OWNER);
+		Date now = new Date();
+		String operator = operatorInfo.getUser().getOperatorName();
+		String traStatus;
+		
+		if(task.isClose()) {
+			actualTask.setStatus(TaskConstant.CLOSED_STATUS);
+			actualTask.setOwnerName(null);
+			actualTask.setCloseTime(now);
+			traStatus = TaskConstant.TRA_CLOSE_STATUS;
+		} else {
+			actualTask.setStatus(TaskConstant.OPEN_STATUS);
+			traStatus = TaskConstant.TRA_PROCESS_STATUS;
+		}
+		
 		actualTask.setUpdateOperator(operatorInfo.getUser().getOperatorName());
+		actualTask.setUpdateTime(now);
 		
 		taskService.saveOrUpdateTask(actualTask);
-		generateAndSaveTransaction(actualTask, 0, TransactionService.PROCESS_STATUS, "", operatorInfo.getUser().getOperatorName());
-
+		generateAndSaveTransaction(actualTask, 0, traStatus, "", operator);
+		
 	}
 
 	@Override
 	public Task updateTaskByMerchantId(TaskTO task, UserInfo<Operator> operatorInfo) {
 		Task actualTask = taskService.getTaskByMerchantId(task.getSubsysTaskId());
 
-		actualTask.setStatus(TaskStatus.OPEN_STATUS);
-		actualTask.setOwner(NO_OWNER);
+		actualTask.setStatus(TaskConstant.OPEN_STATUS);
+		actualTask.setOwner(TaskConstant.NO_OWNER);
 		actualTask.setOwnerName(null);
 		actualTask.setOpenTime(null);
 		actualTask.setCloseTime(null);
 		actualTask.setUpdateOperator(operatorInfo.getUserName());
 		actualTask.setState(stateService.getState(200));
 		taskService.saveOrUpdateTask(actualTask);
-		generateAndSaveTransaction(actualTask, NO_OWNER, TransactionService.PROCESS_STATUS, "", operatorInfo.getUser().getOperatorName());
+		generateAndSaveTransaction(actualTask, TaskConstant.NO_OWNER, TaskConstant.TRA_PROCESS_STATUS, "", operatorInfo.getUser().getOperatorName());
 
 		return actualTask;
 	}
@@ -459,7 +481,7 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 	public void closeTask(TaskTO task, UserInfo<Operator> operatorInfo) {
 		Task actualTask = taskService.getTask(task.getTaskId());
 		
-		if(actualTask.getStatus().equalsIgnoreCase(TaskStatus.CLOSED_STATUS)){
+		if(actualTask.getStatus().equalsIgnoreCase(TaskConstant.CLOSED_STATUS)){
 			throw new AdminServiceBaseException(AdminErrorCode.WORKFLOW_TASK_ALREADY_CLOSE, "Task already close");
 		}
 
@@ -478,7 +500,7 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 		}
 		
 		actualTask.setStatus("C");
-		actualTask.setOwner(NO_OWNER);
+		actualTask.setOwner(TaskConstant.NO_OWNER);
 		actualTask.setOwnerName(null);
 		String operator;
 		operator = operatorInfo.getUser().getOperatorName();
@@ -486,19 +508,19 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 		actualTask.setCloseTime(new Date());
 		actualTask.setUpdateTime(new Date());
 		taskService.saveOrUpdateTask(actualTask);
-		generateAndSaveTransaction(actualTask, 0, TransactionService.CLOSE_STATUS, "", operator);
+		generateAndSaveTransaction(actualTask, 0, TaskConstant.TRA_CLOSE_STATUS, "", operator);
 	}
 
 	@Override
 	public Task closeTaskByMerchantId(TaskTO task, UserInfo<Operator> operatorInfo) {
 		Task actualTask = taskService.getTaskByMerchantId(task.getSubsysTaskId());
 
-		if(actualTask.getStatus().equalsIgnoreCase(TaskStatus.CLOSED_STATUS)){
+		if(actualTask.getStatus().equalsIgnoreCase(TaskConstant.CLOSED_STATUS)){
 			throw new AdminServiceBaseException(AdminErrorCode.WORKFLOW_TASK_ALREADY_CLOSE, "Task already close");
 		}
 
-		actualTask.setStatus(CLOSED_STATUS);
-		actualTask.setOwner(NO_OWNER);
+		actualTask.setStatus(TaskConstant.CLOSED_STATUS);
+		actualTask.setOwner(TaskConstant.NO_OWNER);
 		actualTask.setOwnerName(null);
 		String operator;
 		operator = operatorInfo.getUser().getOperatorName();
@@ -506,16 +528,16 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 		actualTask.setUpdateTime(new Date());
 		actualTask.setCloseTime(new Date());
 		taskService.saveOrUpdateTask(actualTask);
-		generateAndSaveTransaction(actualTask, NO_OWNER, TransactionService.CLOSE_STATUS, "", operator);
+		generateAndSaveTransaction(actualTask, TaskConstant.NO_OWNER, TaskConstant.TRA_CLOSE_STATUS, "", operator);
 		return actualTask;
 	}
 
 	@Override
 	public void closeTaskWithOutCheck(TaskTO task, UserInfo<Operator> operatorInfo) {
 		Task actualTask = taskService.getTask(task.getTaskId());
-		if(!actualTask.getStatus().equalsIgnoreCase(TaskStatus.CLOSED_STATUS)){
-			actualTask.setStatus(CLOSED_STATUS);
-			actualTask.setOwner(NO_OWNER);
+		if(!actualTask.getStatus().equalsIgnoreCase(TaskConstant.CLOSED_STATUS)){
+			actualTask.setStatus(TaskConstant.CLOSED_STATUS);
+			actualTask.setOwner(TaskConstant.NO_OWNER);
 
 			/* TODO fix : merchant reject will close task and give approive stateId 201 */
 			/* future work: wps- call updateTask to change stateId  */
@@ -529,7 +551,7 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 			actualTask.setUpdateTime(new Date());
 			actualTask.setCloseTime(new Date());
 			taskService.saveOrUpdateTask(actualTask);
-			generateAndSaveTransaction(actualTask, NO_OWNER, TransactionService.CLOSE_STATUS, "", operator);
+			generateAndSaveTransaction(actualTask, TaskConstant.NO_OWNER, TaskConstant.TRA_CLOSE_STATUS, "", operator);
 		}
 	}
 
@@ -559,38 +581,32 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 
 	@Override
 	public void logViewer(UserInfo<Operator> userInfo, Integer taskId) {
-	    CacheManager cm = CacheManager.getCacheManager("cache-ap-admin");
-        Cache viewCache = cm.getCache("task-operator-viewers");
+        Cache viewCache = redisCacheManager.getCache("task-operator-viewers");
 		Task task = taskService.getTask(taskId);
-		String taskStateKey = task.getTaskId().toString() + "-" + task.getState().getStateId();
-		Set<String> viewerNames = Sets.newLinkedHashSet();
-		Element element = viewCache.get(taskStateKey);
-		if(element!=null){
-			viewerNames= (Set<String>) element.getObjectValue();
+		String taskStateKey = "taskView:" + task.getTaskId() + "-" + task.getState().getStateId();
+		LinkedHashSet<String> viewerNames = viewCache.get(taskStateKey, LinkedHashSet.class);
+		if(viewerNames ==null){
+			viewerNames= Sets.newLinkedHashSet();
 		}
 		viewerNames.add(userInfo.getUser().getOperatorName());
-		element=new Element(taskStateKey,viewerNames);
-		viewCache.put(element);
+		viewCache.put(taskStateKey, viewerNames);
 	}
 
 
 	@Override
 	public List<String> getTaskViewers(UserInfo<Operator> operator,Integer taskId) {
-		CacheManager cm = CacheManager.getCacheManager("cache-ap-admin");
-		Cache viewCache = cm.getCache("task-operator-viewers");
+		Cache viewCache = redisCacheManager.getCache("task-operator-viewers");
 		
 		Task task = taskService.getTask(taskId);
-		String taskStateKey = task.getTaskId().toString() + "-" + task.getState().getStateId();
-		Set<String> viewerNames = Sets.newLinkedHashSet();
-		Element element = viewCache.get(taskStateKey);
-		if(element!=null){
-			viewerNames= (Set<String>) element.getObjectValue();
+		String taskStateKey = "taskView:" + task.getTaskId()+ "-" + task.getState().getStateId();
+		LinkedHashSet<String> viewerNames = viewCache.get(taskStateKey, LinkedHashSet.class);
+		if(viewerNames == null){
+			viewerNames= Sets.newLinkedHashSet();
 		}
 		viewerNames.add(operator.getUser().getOperatorName());	
-		element=new Element(taskStateKey,viewerNames);
-		viewCache.put(element);
+		viewCache.put(taskStateKey, viewerNames);
 		
-		List<String> returnList = Lists.newLinkedList((Set<String>) viewCache.get(taskStateKey).getObjectValue());
+		List<String> returnList = Lists.newLinkedList((Set<String>) viewerNames);
 		
 		returnList.remove(operator.getUser().getOperatorName());
 		
@@ -602,7 +618,7 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public List<TaskType> getStateLabel() {
 	    
-	    UserInfo<Operator> userInfo = operatorAuthService.getOperatorByToken(RequestHelper.getToken());
+	    UserInfo<Operator> userInfo = RequestHelper.getCurrentUser();
 	    
 	    boolean isViewSysHelper = roleMenuPermissionService.verifyMenuItemPermission(userInfo.getUser().getOperatorId(), roleMenuPermissionService.queryMenuItemById(10800));
 	    boolean isViewMerchant = roleMenuPermissionService.verifyMenuItemPermission(userInfo.getUser().getOperatorId(), roleMenuPermissionService.queryMenuItemById(10400));
@@ -641,13 +657,9 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 		List<Integer> merchantIds = new ArrayList<>();
 		if(CollectionUtils.isNotEmpty(merchList)){
 			for(Map<String,String> map :merchList){
-				for (Map.Entry<String, String> entry : map.entrySet()) {
-				    String value = entry.getValue();
-				    String key = entry.getKey();
-
-				    if("merchantId".equalsIgnoreCase(key)){
-				    	merchantIds.add(Integer.parseInt(value));
-				    }
+				String merchantId = map.get("merchantId");
+				if(merchantId != null) {
+					merchantIds.add(Integer.parseInt(merchantId));
 				}
 			}
 		}
@@ -661,7 +673,7 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 	@Override
 	public Task createMultipleTask(TaskTO taskTO) {
 		 if(taskTO.getStateId() == null) {
-	            throw new AdminServiceBaseException(IErrorCode.UNKNOWN_ERROR, "State is null");
+	            throw new AdminServiceBaseException(AdminErrorCode.UNKNOWN_ERROR, "State is null");
 	        }
 
 			Merchant merchant = null;
@@ -669,27 +681,28 @@ public class WorkFlowServiceImpl implements WorkFlowService {
 			if(StringUtils.isNotEmpty(taskTO.getMerchantCode())){
 				merchant = merchantRepository.findByMerchantCode(taskTO.getMerchantCode());
 			}
+			
+			return saveTaskTo(taskTO, merchant);
+	}
 
+	private Task saveTaskTo(TaskTO taskTO, Merchant merchant) {
+		Task task = new Task();
+		task.setDescription(taskTO.getTaskDescription());
+		task.setMerchantId(merchant != null ? merchant.getMerchantId() : null);
+		task.setState(stateService.getState(taskTO.getStateId()));
+		task.setSubSystemTask(taskTO.getSubsysTaskId());
+		task.setUpdateTime(null);
+		if (StringTools.isEmptyOrNull(taskTO.getOperatorName())) {
+			task.setCreateOperator(TaskConstant.SYSTEM_OPERATOR);
+		} else {
+			task.setCreateOperator(taskTO.getOperatorName());
+		}
+			task.setOwner(TaskConstant.NO_OWNER);
+			task.setStatus(TaskConstant.OPEN_STATUS);
 
-	        Task   task = new Task();
-			task.setDescription(taskTO.getTaskDescription());
-			task.setMerchantId(merchant != null ? merchant.getMerchantId() : null);
-			task.setState(stateService.getState(taskTO.getStateId()));
-			task.setSubSystemTask(taskTO.getSubsysTaskId());
-			task.setUpdateTime(null);
-			if (StringTools.isEmptyOrNull(taskTO.getOperatorName())) {
-				task.setCreateOperator(SYSTEM_OPERATOR);
-			} else {
-				task.setCreateOperator(taskTO.getOperatorName());
-			}
-				task.setOwner(NO_OWNER);
-				task.setStatus(OPEN_STATUS);
-
-			task = taskService.saveAndMerge(task);
-			generateAndSaveTransaction(task, NO_OWNER, TransactionService.CREATE_STATUS, "", SYSTEM_OPERATOR);
-	        
-
-			return task;
+		task = taskService.saveAndMerge(task);
+		generateAndSaveTransaction(task, TaskConstant.NO_OWNER, TaskConstant.TRA_CREATE_STATUS, "", TaskConstant.SYSTEM_OPERATOR);
+        return task;
 	}
 
 	@Override

@@ -21,11 +21,11 @@ public class SystemHelperTO {
 
     private Integer createOperator;
 
-    private Integer UpdateOperator;
+    private Integer updateOperator;
 
     private String createOperatorName;
 
-    private String UpdateOperatorName;
+    private String updateOperatorName;
     
     private String action;
     
@@ -100,11 +100,11 @@ public class SystemHelperTO {
     }
 
     public Integer getUpdateOperator() {
-        return UpdateOperator;
+        return updateOperator;
     }
 
     public void setUpdateOperator(Integer updateOperator) {
-        UpdateOperator = updateOperator;
+        this.updateOperator = updateOperator;
     }
 
     public String getCreateOperatorName() {
@@ -116,11 +116,11 @@ public class SystemHelperTO {
     }
 
     public String getUpdateOperatorName() {
-        return UpdateOperatorName;
+        return updateOperatorName;
     }
 
     public void setUpdateOperatorName(String updateOperatorName) {
-        UpdateOperatorName = updateOperatorName;
+        this.updateOperatorName = updateOperatorName;
     }
 
 	public String getAction() {

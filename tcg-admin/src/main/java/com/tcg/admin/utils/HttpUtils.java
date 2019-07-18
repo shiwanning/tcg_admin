@@ -12,7 +12,9 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
@@ -26,7 +28,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +53,7 @@ public class HttpUtils {
     private static final HttpClientBuilder HTTPCLIENT_BUILDER = HttpClientBuilder.create().setDefaultRequestConfig(REQUEST_CONFIG);
 
     private HttpUtils() {
-    	
+    	throw new IllegalStateException("Utility class");
     }
     
     public static StringBuilder post(String domain, String resource, Map<String, String> parameter) {
@@ -86,9 +92,12 @@ public class HttpUtils {
         CloseableHttpResponse response = null;
         StringBuilder resultString = new StringBuilder();
         try {
-        	if("json".equals(type)) {
+        	if("JSON".equals(type)) {
         		post.setHeader(HTTP.CONTENT_TYPE, SystemConstant.JSON_UTF_8);
-                post.setEntity(new StringEntity(new ObjectMapper().writeValueAsString(parameter)));
+        		String body = new ObjectMapper().writeValueAsString(parameter);
+                post.setEntity(new StringEntity(body, ContentType.APPLICATION_JSON));
+                
+                LOGGER.debug("entity {}", body);
                 response = httpClient.execute(post);
         	} else {
         		List<NameValuePair> nameValuePairs = new LinkedList<>();
@@ -98,6 +107,7 @@ public class HttpUtils {
                 String query = URLEncodedUtils.format(nameValuePairs, StandardCharsets.UTF_8);
                 post.setHeader(HTTP.CONTENT_TYPE, SystemConstant.X_WWW_FORM_UTF_8);
                 post.setEntity(new StringEntity(query));
+                LOGGER.debug("entity {}", query);
 
                 if(StringTools.isNotEmpty(domain)) {
                     response = httpClient.execute(host, post);
@@ -105,7 +115,6 @@ public class HttpUtils {
                     response = httpClient.execute(post);
                 }
         	}
-            LOGGER.debug("entity {}", post.getRequestLine());
             resultString = inputStreamToString(response,domain);
         } catch (Exception e) {
             LOGGER.error("Send HTTP request error!", e);
@@ -134,6 +143,17 @@ public class HttpUtils {
         return getStringBuilder(url,get);
     }
 
+    public static String doGet(String url, NameValuePair... nvps) {
+        URI builder;
+        try {
+            builder = new URIBuilder(url).addParameters(Arrays.asList(nvps)).build();
+        } catch (URISyntaxException e) {
+            throw new AdminServiceBaseException(AdminErrorCode.GENERIC_SYSTEM_ERROR, "Connect failed: " + url, e);
+        }
+        HttpGet httpget = new HttpGet(builder);
+        return getStringBuilder(url,httpget);
+    }
+
     /**
      * including headers information
      * @param url
@@ -159,6 +179,7 @@ public class HttpUtils {
         }
         return get;
     }
+
 
     /**
      * get StringBuilder
@@ -220,5 +241,14 @@ public class HttpUtils {
         }
         LOGGER.debug("\nURL: {} \nResult: {}", logInfo, resultString);
         return resultString;
+    }
+
+    public static NameValuePair[] getNameValuePairs(Map<String, String> params) {
+        NameValuePair[] nvpArray = new NameValuePair[params.size()];
+        int idx = 0;
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            nvpArray[idx++] = new BasicNameValuePair(entry.getKey(), entry.getValue());
+        }
+        return nvpArray;
     }
 }

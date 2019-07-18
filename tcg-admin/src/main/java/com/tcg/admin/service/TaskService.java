@@ -9,8 +9,6 @@ import java.util.List;
 
 public interface TaskService {
 
-	public static final Integer CREATE_MERCHANT_ERROR = 202;
-
 	List<Task> findAll();
 
 	/**

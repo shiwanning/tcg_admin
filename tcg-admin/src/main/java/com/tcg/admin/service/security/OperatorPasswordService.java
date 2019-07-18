@@ -71,7 +71,7 @@ public class OperatorPasswordService {
 
         checkCustomerStatus(operator);
 
-        String newPassword = passwordGenerator.create();
+        String newPassword = passwordGenerator.makeRandomPassword();
 
         String context = String.format(EMAIL_CONTENT_FIND_DWP_TEMPLATE, newPassword);
         sendMail(operator, EMAIL_SUBJECT_FIND_DWP, context);
@@ -116,7 +116,10 @@ public class OperatorPasswordService {
 
     private void checkCustomerStatus(Operator operator) {
         int[] forbidden = {LoginConstant.ACTIVE_FLAG_LOGIN_FORBID.getStatusCode(), 
-                           LoginConstant.ACTIVE_FLAG_DELETE.getStatusCode()}; // 狀態禁止使用email找回密碼
+                           LoginConstant.ACTIVE_FLAG_DELETE.getStatusCode(),
+                LoginConstant.ACTIVE_FLAG_SYSTEM_LOGIN_PROHIBITED.getStatusCode(),
+                LoginConstant.ACTIVE_FLAG_PASSWORD_LOGIN_PROHIBITED.getStatusCode(),
+        }; // 狀態禁止使用email找回密碼
         for (int i : forbidden) {
             if (operator.getActiveFlag() == i) {
                 throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_ACTIVE_FLAG_ERROR, "Operator has been forbidden");
@@ -129,6 +132,7 @@ public class OperatorPasswordService {
         operator.setPassword(hash(MD5, plainPassword));
         operator.setActiveFlag(LoginConstant.ACTIVE_FLAG_LOGIN_SUCCESS.getStatusCode());
         operator.setErrorCount(0);
+        operator.setGoogleErrorCount(0);
         operatorRepository.save(operator);
         return plainPassword;
     }

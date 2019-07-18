@@ -11,10 +11,6 @@ import com.tcg.admin.to.TaskQueryTO;
 
 public interface TaskHistoryService {
 
-	static final String SYSTEM_OPERATOR = "SYS";
-
-	static final String CLOSED_TASK = "C";
-
 	Page<Task> getAll(TaskQueryTO taskQueryTO);
 
 	List<State> getStateList(String type);

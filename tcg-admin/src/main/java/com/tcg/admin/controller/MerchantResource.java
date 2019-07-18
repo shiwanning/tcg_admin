@@ -1,8 +1,23 @@
 package com.tcg.admin.controller;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import com.tcg.admin.cache.MerchantCacheEvict;
+import com.tcg.admin.common.annotation.OperationLog;
+import com.tcg.admin.common.constants.OperationFunctionConstant;
+import com.tcg.admin.common.error.AdminErrorCode;
+import com.tcg.admin.common.exception.AdminServiceBaseException;
+import com.tcg.admin.common.helper.RequestHelper;
+import com.tcg.admin.model.Merchant;
+import com.tcg.admin.model.Operator;
+import com.tcg.admin.model.Task;
+import com.tcg.admin.service.MerchantService;
+import com.tcg.admin.service.OperatorService;
+import com.tcg.admin.service.RoleMenuPermissionService;
+import com.tcg.admin.service.impl.IMService;
+import com.tcg.admin.to.OperatorCreateTO;
+import com.tcg.admin.to.response.JsonResponse;
+import com.tcg.admin.to.response.JsonResponseT;
+import com.tcg.admin.to.response.MerchantListTo;
+import com.tcg.admin.utils.StringTools;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,19 +33,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.tcg.admin.common.helper.RequestHelper;
-import com.tcg.admin.model.Merchant;
-import com.tcg.admin.model.Operator;
-import com.tcg.admin.model.Task;
-import com.tcg.admin.service.MerchantService;
-import com.tcg.admin.service.OperatorAuthenticationService;
-import com.tcg.admin.service.RoleMenuPermissionService;
-import com.tcg.admin.service.impl.IMService;
-import com.tcg.admin.to.OperatorCreateTO;
-import com.tcg.admin.to.response.JsonResponse;
-import com.tcg.admin.to.response.JsonResponseT;
-import com.tcg.admin.to.response.MerchantListTo;
-import com.tcg.admin.utils.StringTools;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping(value = "/resources/merchants", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -40,9 +45,9 @@ public class MerchantResource {
 
     @Autowired
 	private MerchantService merchantService;
-
+    
     @Autowired
-    private OperatorAuthenticationService operatorAuthService;
+    private OperatorService operatorService;
 	
     @Autowired
     private RoleMenuPermissionService roleMenuPermissionService;
@@ -64,10 +69,19 @@ public class MerchantResource {
 	 * 指派operator到特定品牌
 	 */
     @PutMapping("/{operatorName}/_assign_to_merchant")
+	@OperationLog(type = OperationFunctionConstant.MODIFY_SUBSCRIPTION_MERCHANT)
 	public JsonResponse assignToMerchant(
 	        @PathVariable("operatorName") String operatorName, 
 	        @RequestBody OperatorCreateTO operatorCreateTO) {
-		merchantService.assignOperatorMerchants(operatorName, operatorCreateTO.getMerchantIdList());
+    	/* Operator vaild */
+        //依 operatorName 查詢要指派部門的 Operator
+        Operator operator = operatorService.findOperatorByName(operatorName);
+
+        /* operator 是否存在 */
+        if (operator == null) {
+            throw new AdminServiceBaseException(AdminErrorCode.OPERATOR_NOT_EXIST_ERROR, "operatorName not exists");
+        }
+		merchantService.assignOperatorMerchants(operator, operatorCreateTO.getMerchantIdList());
 		return new JsonResponse(true);
 	}
 
@@ -77,6 +91,7 @@ public class MerchantResource {
 	 * 被复制的用户必须与原用户有相同的角色权限功能
 	 */
 	@PostMapping("/{originOperatorId}/{newOperatorName}/_copy_operator")
+	@OperationLog(type = OperationFunctionConstant.COPY_ACCOUNT)
 	public Operator copyOperator(@PathVariable("originOperatorId") Integer originOperatorId, @PathVariable("newOperatorName") String newOperatorName) {
 		return merchantService.copyOperator(originOperatorId, newOperatorName);
 	}
@@ -85,6 +100,7 @@ public class MerchantResource {
 	 * 刪除品牌
 	 */
 	@DeleteMapping("/{merchatId}")
+	@MerchantCacheEvict(allEntries = true)
 	public JsonResponse deleteMerchant(@PathVariable("merchatId") Integer merchatId) {
 		merchantService.deleteMerchant(merchatId);
 		return new JsonResponse(true);
@@ -92,6 +108,7 @@ public class MerchantResource {
 
 	// *TCGAdmin: 1.creater operator(admin) 2.subscribe merchant to operator 3.subscribe to "system" roles 4.closed task
 	@PutMapping("/approve_merchant")
+	@MerchantCacheEvict(allEntries = true)
 	public JsonResponseT<Boolean> approveMerchant(@RequestBody OperatorCreateTO operatorCreateTO) {
 		List<Integer> operatorIdList = new ArrayList<>();
 		List<Integer> roleIdList = new ArrayList<>();
@@ -111,6 +128,7 @@ public class MerchantResource {
 	}
 
 	@PostMapping
+	@MerchantCacheEvict(allEntries = true)
 	public JsonResponseT<Task> createMerchant(@RequestBody OperatorCreateTO operatorCreateTO) {
 		JsonResponseT<Task> response = new JsonResponseT<>(true);
 		Task task = merchantService.createMerchant(operatorCreateTO.getMerchantId(),operatorCreateTO.getOperatorName(),operatorCreateTO.getMerchantName(),operatorCreateTO.getBaseMerchantCode());
@@ -120,6 +138,7 @@ public class MerchantResource {
 	}
 
 	@PostMapping("/reApprove_merchant")
+	@MerchantCacheEvict(allEntries = true)
 	public JsonResponseT<Task> reApproveMerchant(@RequestBody OperatorCreateTO operatorCreateTO) {
 		JsonResponseT<Task> response = new JsonResponseT<>(true);
 		Task task = merchantService.reApprove(operatorCreateTO);
@@ -129,6 +148,7 @@ public class MerchantResource {
 	}
 
 	@PutMapping("/updateMerchant")
+	@MerchantCacheEvict(allEntries = true)
 	public JsonResponseT<Boolean> updateMerchant(@RequestBody OperatorCreateTO operatorCreateTO) {
 		JsonResponseT<Boolean> response = new JsonResponseT<>(true);
 		merchantService.updateMerchant(operatorCreateTO);
@@ -162,7 +182,7 @@ public class MerchantResource {
    @GetMapping("/getMerchants")
    public JsonResponseT<MerchantListTo> getMerchants() {
        JsonResponseT<MerchantListTo> response = new JsonResponseT<>(true);
-       List<Map<String,String>> merchList = roleMenuPermissionService.getMerchants(operatorAuthService.getOperatorByToken(RequestHelper.getToken()));
+       List<Map<String,String>> merchList = roleMenuPermissionService.getMerchants(RequestHelper.getCurrentUser());
        
        response.setValue(new MerchantListTo(merchList));
        return response;

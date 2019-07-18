@@ -1,5 +1,7 @@
 package com.tcg.admin.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -16,14 +18,16 @@ import com.tcg.admin.to.OperatorCreateTO;
 import com.tcg.admin.to.UserInfo;
 import com.tcg.admin.to.response.JsonResponse;
 import com.tcg.admin.to.response.JsonResponseT;
+import com.tcg.admin.utils.AuthorizationUtils;
 
 @RestController
 @RequestMapping(value = "/resources/operator_sessions", produces = MediaType.APPLICATION_JSON_VALUE)
 public class OperatorSessionResource {
 
+	private static final Logger LOGGER = LoggerFactory.getLogger(OperatorSessionResource.class);
+	
     @Autowired
 	private OperatorAuthenticationService operatorAuthService;
-	
 
 	/**
 	 * Operator login the Business Web Subsystem, the login authentication
@@ -67,28 +71,20 @@ public class OperatorSessionResource {
 	 */
     @GetMapping("{token}/islogin")
 	public JsonResponse getSession(@PathVariable("token") String token) {
-		String result = operatorAuthService.verifyToken(token);
+		String result = AuthorizationUtils.verifyToken(token, true);
 		JsonResponse jsonResponse = new JsonResponse(true);
 		jsonResponse.setMessage(result);
 		return jsonResponse;
-	}
-	
-	/**
-	 * Get value in the session by the key.
-	 */
-    @GetMapping("{token}/{key}/value")
-	public JsonResponseT<Object> getSessionValue(@PathVariable("token") String token, @PathVariable("key") String key) {
-
-		Object obj = operatorAuthService.getSessionValue(token, key);
-		JsonResponseT<Object> response = new JsonResponseT<>(true);
-		response.setValue(obj);
-		return response;
 	}
 
     @GetMapping("checkIdle/{token}")
     public JsonResponseT<Object> checkIdle(@PathVariable("token") String token) {
         JsonResponseT<Object> response = new JsonResponseT<>(true);
-        response.setValue(operatorAuthService.checkIdle(token));
+        Boolean isIdle = operatorAuthService.checkIdle(token);
+        response.setValue(isIdle);
+        if(isIdle) {
+        	LOGGER.info("token {} is idle.", token);
+        }
         return response;
     }
 }

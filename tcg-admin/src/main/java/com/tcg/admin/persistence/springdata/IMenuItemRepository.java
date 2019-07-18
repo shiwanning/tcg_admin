@@ -26,6 +26,9 @@ public interface IMenuItemRepository extends JpaRepository<MenuItem, Integer> {
 
     @Query("SELECT m FROM MenuItem m where m.url = ?1 ")
     MenuItem findByUrl(String url);
+    
+    @Query("SELECT m FROM MenuItem m where m.url = ?1 ")
+    List<MenuItem> findByUrlList(String url);
 
     @Query("SELECT m FROM MenuItem m where m.url like ?1 and m.accessType = ?2 ")
     List<MenuItem> findByBlurUrl(String likeUrl, String accessType);
@@ -78,5 +81,16 @@ public interface IMenuItemRepository extends JpaRepository<MenuItem, Integer> {
 
     @Query("SELECT m.menuId FROM MenuItem m where m.isLeaf = ?1 AND m.createTime > ?2")
     List<Integer> findNewMenuIdByIsLeaf(int isLeaf, Date date);
+    
+    @Query("SELECT m.menuId FROM MenuItem m where m.createTime > ?1")
+    List<Integer> findNewMenuId(Date date);
+    
+    @Query("SELECT m.menuId FROM MenuItem m where m.createTime > ?1 AND m.isButton = ?2")
+    List<Integer> findButtonNewMenuId(Date date, Integer isButton);
 
+    @Query("SELECT m.menuId FROM MenuItem m")
+    List<Integer> findButtons();
+
+    @Query("SELECT m.menuId FROM  MenuItem m where m.parentId = 0")
+    List<Integer> findTopTreeNode();
 }

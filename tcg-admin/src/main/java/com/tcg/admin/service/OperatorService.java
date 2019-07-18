@@ -2,14 +2,12 @@ package com.tcg.admin.service;
 
 
 import java.util.List;
+import java.util.Map;
 
 import com.tcg.admin.common.exception.AdminServiceBaseException;
+import com.tcg.admin.model.BehaviorLog;
 import com.tcg.admin.model.Operator;
-import com.tcg.admin.to.ActivityLog;
-import com.tcg.admin.to.OperatorCreateTO;
-import com.tcg.admin.to.OperatorsTO;
-import com.tcg.admin.to.QueryJsonTO;
-import com.tcg.admin.to.UserInfo;
+import com.tcg.admin.to.*;
 
 /**
  * <pre>
@@ -23,8 +21,6 @@ import com.tcg.admin.to.UserInfo;
  */
 
 public interface OperatorService {
-	Integer ACTIVE_FLAG_TEMP = 8;
-	Integer ACTIVE_FLAG = 1;
 	/**
 	 * <pre>
 	 * Register an new back-end Operator, this will return an Operator model
@@ -58,7 +54,6 @@ public interface OperatorService {
 
 	Operator addOperatorOfMerchant(OperatorCreateTO operatorCreateTO);
 
-//    void addProfile(Integer opId);
 	/**
 	 * <pre>
 	 * Change back-end operator's active flag status. To inactive or active by operatorName and activeFlag.
@@ -78,7 +73,7 @@ public interface OperatorService {
 	 *             LoginConstant.ActiveFlagDelete
 	 * @see com.yx.commons.constant.LoginConstant
 	 */
-    void changeActiveFlag(String operatorName, int activeFlag);
+	Operator changeActiveFlag(String operatorName, int activeFlag);
 
 
 	/**
@@ -112,7 +107,7 @@ public interface OperatorService {
 	 *             LoginConstant.ActiveFlagDelete.
 	 * @see com.yx.commons.constant.LoginConstant
 	 */
-	void resetPassword(String username);
+	Map<String, String> resetPassword(String username);
 
 
 	/**
@@ -123,8 +118,9 @@ public interface OperatorService {
      */
 	void assignRoles(Integer operatorId, List<Integer> roles);
 
-    QueryJsonTO queryOperator2(String operatorName, Integer roleId, Integer activeFlag, Integer merchantId, String baseMerchantCode,Integer offset, Integer length, String sortBy, String sortOrder);
+    QueryJsonTO queryOperator2(String operatorName, Integer roleId, Integer activeFlag, Integer merchantId, String baseMerchantCode,String lastLoginIP, PageableTO pageableTo);
 
+    List<Integer> querySubscriptionMerchant(Integer userId);
 	/**
 	 * find Operator By Id
 	 * @param operatorId
@@ -143,7 +139,6 @@ public interface OperatorService {
      *
      * @throws AdminServiceBaseException
      */
-    //    void updateOperator(Integer operatorId, String nickname, String email);
     void updateOperator(Operator operator);
 
     /**
@@ -194,12 +189,17 @@ public interface OperatorService {
      * @param operator operator model that include mandatory fields which are
      *                 username, oldPassword, newPassword, confirmPassword.
      *
-     * @throws UserServiceBaseException
+     * @param b
+	 * @throws UserServiceBaseException
      * @see com.yx.commons.constant.LoginConstant
      */
-    void changeOperatorPassword(String username, String oldPassword, String newPassword, String confirmPassword);
+    void changeOperatorPassword(String username, String oldPassword, String newPassword, String confirmPassword, boolean isReset);
 
-    List<ActivityLog> getActivityLog(UserInfo<Operator> userInfo, Integer page, Integer pageSize, Integer actionType);
+    Map<String, Object> getActivityLog(String userName, Integer page, Integer pageSize, Integer actionType);
+
+    Map<String, Object> getOperatorProfile(String userName);
+
+    BehaviorLog getCurrentLoginBehaviorLog(String userName);
     
     Object findOperatorBySession(String token, boolean flag);
 
@@ -215,4 +215,12 @@ public interface OperatorService {
     void updateBaseMerchant(OperatorCreateTO operatorCreateTO);
 
     List<Operator> findOperatorByIds(List<Integer> operatorIds);
+
+	List<BehaviorLogTo> getActivityLoginLog(String userName, Integer page, Integer pageSize);
+
+	void updateThirtyNotLoginUser();
+
+	void updateUsOperatorByMisMerchantStatus(Integer active, String merchantCode);
+
+	Map<String, Object> findOperatorByAccountName(String accountName);
 }

@@ -23,13 +23,11 @@ import com.tcg.admin.service.RoleMenuPermissionService;
 import com.tcg.admin.service.VerificationService;
 import com.tcg.admin.to.UserInfo;
 import com.tcg.admin.to.VerificationData;
+import com.tcg.admin.utils.AuthorizationUtils;
 
 @Service
 @Transactional
 public class VerificationServiceImpl implements VerificationService {
-	
-    @Autowired
-	private OperatorLoginService operatorLoginService;
 	
     @Autowired
 	private	RoleMenuPermissionService roleMenuPermissionService;
@@ -52,7 +50,10 @@ public class VerificationServiceImpl implements VerificationService {
 
 	@Override
 	public boolean basic(VerificationData verificationData) {
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(verificationData.getToken());
+		if(!AuthorizationUtils.isLogin(verificationData.getToken())) {
+			return false;
+		}
+		UserInfo<Operator> userInfo = AuthorizationUtils.getSessionUser(verificationData.getToken());
 		MenuItem menuItem= roleMenuPermissionService.queryMenuItemById(verificationData.getMenuId());
 		return !(menuItem == null || !roleMenuPermissionService.verifyMenuItemPermission(userInfo.getUser().getOperatorId(), menuItem));
 	}
@@ -60,7 +61,10 @@ public class VerificationServiceImpl implements VerificationService {
 	@Override
 	@Transactional(propagation = Propagation.REQUIRED)
 	public boolean advanced(VerificationData verificationData) {
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(verificationData.getToken());
+
+		if(verificationData.getToken() == null || verificationData.getMenuId() == null || !AuthorizationUtils.isLogin(verificationData.getToken())) {
+			return false;
+		}
 
 		MenuItem menuItem= roleMenuPermissionService.queryMenuItemById(verificationData.getMenuId());
 		if(menuItem == null){
@@ -70,9 +74,10 @@ public class VerificationServiceImpl implements VerificationService {
 		}
 
 		/* admin does not need to verify permission*/
-		if(merchantService.checkAdmin(false).isAdmin()){
+		if(verificationData.getToken() != null && merchantService.checkAdmin(false).isAdmin()){
 			return true;
-		}else if(!roleMenuPermissionService.verifyMenuItemPermission(userInfo.getUser().getOperatorId(), menuItem)){
+		} else if(
+				!roleMenuPermissionService.verifyMenuItemPermission(AuthorizationUtils.getSessionUser(verificationData.getToken()).getUser().getOperatorId(), menuItem)) {
 			return false;
 		}
 		return true;
@@ -94,7 +99,7 @@ public class VerificationServiceImpl implements VerificationService {
 
 	@Override
 	public boolean task(VerificationData verificationData) {
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(verificationData.getToken());
+		UserInfo<Operator> userInfo = AuthorizationUtils.getSessionUser(verificationData.getToken());
 		Task task = taskRepository.findOne(verificationData.getWorkflowId());
 		State state = task.getState();
 		MenuItem menuItem= roleMenuPermissionService.queryMenuItemById(state.getMenuId());
@@ -105,28 +110,43 @@ public class VerificationServiceImpl implements VerificationService {
 
 	@Override
 	public boolean byResourceUrl(VerificationData verificationData) {
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(verificationData.getToken());
+		if(verificationData.getToken() == null || !AuthorizationUtils.isLogin(verificationData.getToken()) ) {
+			return false;
+		}
+		UserInfo<Operator> userInfo = AuthorizationUtils.getSessionUser(verificationData.getToken());
 
         if(userInfo == null) {
             return false;
         }
-		MenuItem menuItem = menuItemRepository.findByUrl(verificationData.getUrl());
-		if(menuItem == null){
-			return false;
-		}
-
-		/* admin does not need to verify permission*/
+        
+        /* admin does not need to verify permission*/
 		if(merchantService.checkAdmin(false).isAdmin()){
 			return true;
 		}
-
-		return roleMenuPermissionService.verifyMenuItemPermission(userInfo.getUser().getOperatorId(), menuItem);
+        
+		List<MenuItem> menuItems = menuItemRepository.findByUrlList(verificationData.getUrl());
+		
+		if(menuItems.isEmpty()){
+			return false;
+		}
+		
+		for(MenuItem menuItem : menuItems) {
+			if(roleMenuPermissionService.verifyMenuItemPermission(userInfo.getUser().getOperatorId(), menuItem)) {
+				return true;
+			}
+		}
+		
+		return false;
 	}
 
 	@Override
 	@Transactional(propagation = Propagation.REQUIRED)
 	public boolean advancedByResourceUrl(VerificationData verificationData) {
-		UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(verificationData.getToken());
+		if(verificationData.getToken() == null) {
+			return false;
+		}
+		
+		UserInfo<Operator> userInfo = AuthorizationUtils.getSessionUser(verificationData.getToken());
 
 		if(userInfo == null) {
 			return false;
@@ -148,7 +168,10 @@ public class VerificationServiceImpl implements VerificationService {
 
     @Override
     public boolean merchant(VerificationData verificationData) {
-        UserInfo<Operator> userInfo = operatorLoginService.getSessionUser(verificationData.getToken());
+    	if(verificationData.getToken() == null) {
+    		return false;
+    	}
+        UserInfo<Operator> userInfo = AuthorizationUtils.getSessionUser(verificationData.getToken());
 
         if(userInfo == null) {
             return false;

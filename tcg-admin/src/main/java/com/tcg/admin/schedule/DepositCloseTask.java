@@ -24,7 +24,7 @@ public class DepositCloseTask {
     @Scheduled(cron = "0 15 0 * * ?")   
     public void execute() {
         LOGGER.info("close deposit task start.");
-        closeDeposit(14);
+        closeDeposit(7);
         LOGGER.info("close deposit task end.");
     }
 

@@ -1,5 +1,7 @@
 package com.tcg.admin.to;
 
+import com.tcg.admin.model.Role;
+
 import java.io.Serializable;
 import java.util.List;
 
@@ -11,7 +13,9 @@ public class RoleCreateTO implements Serializable{
 	private String description;
 	private Integer displayOrder;
 	private Integer roleId;
-	
+	private List<Integer> menuIdList;
+	private Role.Status googleOtpActive;
+
 	public List<Integer> getCategoryId() {
 		return categoryId;
 	}
@@ -42,7 +46,18 @@ public class RoleCreateTO implements Serializable{
 	public void setRoleId(Integer roleId) {
 		this.roleId = roleId;
 	}
-	
-	
 
+	public List<Integer> getMenuIdList() {
+		return menuIdList;
+	}
+
+	public void setMenuIdList(List<Integer> menuIdList) {
+		this.menuIdList = menuIdList;
+	}
+	public Role.Status getGoogleOtpActive() {
+		return googleOtpActive;
+	}
+	public void setGoogleOtpActive(Role.Status googleOtpActive) {
+		this.googleOtpActive = googleOtpActive;
+	}
 }
