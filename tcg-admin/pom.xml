@@ -85,7 +85,7 @@
         <common.bean.utils.version>1.8.3</common.bean.utils.version>
         <commons-configuration.version>1.10</commons-configuration.version>
         <commons-lang3.version>3.3.2</commons-lang3.version>
-        <commons-collections.version>3.2.1</commons-collections.version>
+        <commons-collections.version>3.2.2</commons-collections.version>
         <commons-math3.version>3.6.1</commons-math3.version>
         <bcprov.version>1.46</bcprov.version>
         <commons-codec.version>1.9</commons-codec.version>
