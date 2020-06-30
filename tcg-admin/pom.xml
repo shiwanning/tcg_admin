@@ -16,7 +16,7 @@
     <properties>
         <spring.version>4.3.12.RELEASE</spring.version>
         <springfox-swagger2.version>2.7.0</springfox-swagger2.version>
-        <jackson.version>2.9.2</jackson.version>
+        <jackson.version>2.11.1</jackson.version>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- ============================================ -->
