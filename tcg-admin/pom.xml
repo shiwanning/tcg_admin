@@ -120,7 +120,7 @@
         <!-- ============================================ -->
         <!-- Test   -->
         <!-- ============================================ -->
-        <junit.version>4.12</junit.version>
+        <junit.version>4.13.1</junit.version>
         <jBehave.version>3.9.2</jBehave.version>
         <jBehave.runner.version>1.1.0</jBehave.runner.version>
         <powermock.version>1.5.5</powermock.version>
